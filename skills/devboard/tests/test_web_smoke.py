@@ -159,3 +159,13 @@ def test_english_by_default(base_url, browser_page):
     page.goto(base_url + "#/p")
     page.get_by_text("Not started; scope open or closed.").wait_for()
     page.get_by_text("Priority queue only").wait_for()
+
+
+def test_claim_is_shown_on_board_and_card(base_url, browser_page):
+    store.Board("p").claim("21", "codex-1", note="writing tests")
+    page = browser_page
+    page.goto(base_url + "#/p")
+    page.locator('.card[data-id="21"] .agent', has_text="codex-1").wait_for()
+    page.goto(base_url + "#/p/card/21")
+    page.get_by_text("codex-1 is working on this").wait_for()
+    page.get_by_text("codex-1 claimed it").wait_for()

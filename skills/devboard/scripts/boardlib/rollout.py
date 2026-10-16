@@ -168,7 +168,10 @@ class RolloutBoard:
     def _read_only(self, *args, **kwargs):
         raise store.ReadOnly("rollout boards are read-only; write through the command-center's scripts/lib/ledger.py")
 
-    add = set = note = check = move = message = reply = attach = attach_stream = detach = _read_only
+    add = set = note = check = move = message = reply = attach = attach_stream = detach = claim = release = _read_only
+
+    def claims(self):
+        return []
 
     def messages(self, cid):
         return []

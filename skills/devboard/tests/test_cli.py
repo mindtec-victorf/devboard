@@ -132,3 +132,37 @@ def test_archive_hides_board(tmp_path):
     assert run("archive", "p")[0] == 0
     assert "p " not in run("boards")[1] and "archived" in run("boards", "--all")[1]
     assert run("unarchive", "p")[0] == 0 and "p  board" in run("boards")[1]
+
+
+def test_claim_cli_needs_a_name_and_reports_conflict(tmp_path, monkeypatch):
+    run("init", "p", "--title", "P")
+    run("add", "1", "--board", "p", "--title", "A")
+    monkeypatch.delenv("DEVBOARD_AGENT", raising=False)
+    code, _, err = run("claim", "1", "--board", "p")
+    assert code == 2 and "--as" in err
+    assert run("claim", "1", "--board", "p", "--as", "codex-1", "--note", "on it")[0] == 0
+    code, _, err = run("claim", "1", "--board", "p", "--as", "claude-a")
+    assert code == 3 and "codex-1" in err
+    assert "codex-1" in run("who", "--board", "p")[1]
+    assert "claimed: codex-1" in run("summary", "--board", "p")[1]
+    code, _, err = run("note", "1", "busy?", "--board", "p", "--by", "claude-a")
+    assert code == 0 and "claimed by codex-1" in err
+    assert run("release", "1", "--board", "p", "--as", "codex-1")[0] == 0
+    assert "nobody" in run("who", "--board", "p")[1]
+
+
+def test_claims_in_hint_and_write_warnings(tmp_path):
+    repo = tmp_path / "r"
+    repo.mkdir()
+    run("init", "p", "--title", "P", "--repo", str(repo))
+    md = tmp_path / "c.md"
+    md.write_text("- [ ] a\n", encoding="utf-8")
+    run("add", "1", "--board", "p", "--title", "A", "--md-file", str(md))
+    run("claim", "1", "--board", "p", "--as", "codex-1")
+    assert "1 claimed by agents (devboard who)" in run("hint", "--cwd", str(repo))[1]
+    for args in (("check", "1", "1"), ("move", "1", "doing")):
+        code, _, err = run(*args, "--board", "p", "--by", "claude-a")
+        assert code == 0 and "claimed by codex-1" in err
+    f = tmp_path / "a.txt"
+    f.write_text("x", encoding="utf-8")
+    assert "claimed by codex-1" in run("attach", "1", str(f), "--board", "p", "--by", "claude-a")[2]

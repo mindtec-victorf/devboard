@@ -210,3 +210,10 @@ def test_archive_route(srv, card):
     assert req(srv, "GET", "/api/boards")[1][0]["archived"] is True
     assert req(srv, "POST", "/api/boards/p/archive", {"archived": False}, H)[1]["archived"] is False
     assert req(srv, "POST", "/api/boards/nope/archive", {"archived": True}, H)[0] == 404
+
+
+def test_claim_is_visible_in_api(srv, card):
+    store.Board("p").claim("1", "codex-1", note="tests")
+    j = req(srv, "GET", "/api/b/p")[1]
+    assert j["cards"][0]["claimed_by"]["agent"] == "codex-1"
+    assert req(srv, "GET", "/api/b/p/claims")[1][0]["agent"] == "codex-1"

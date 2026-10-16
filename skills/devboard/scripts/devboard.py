@@ -39,6 +39,8 @@ def line(c):
         s += f" | inbox: {c['messages_open']}"
     if c.get("files_count"):
         s += f" | files: {c['files_count']}"
+    if c.get("claimed_by"):
+        s += f" | claimed: {c['claimed_by']['agent']} (until {c['claimed_by']['until'][11:16]})"
     return s
 
 
@@ -134,6 +136,7 @@ def cmd_add(a):
 
 def cmd_set(a):
     b = pick(a)
+    warn_claim(b, a.card, a.by)
     ch = changes_from(a, b.card(a.card).get("tags") or [])
     if not ch and not a.note:
         raise store.BoardError("nothing to change (see devboard.py set --help)")
@@ -141,11 +144,15 @@ def cmd_set(a):
 
 
 def cmd_note(a):
-    print(line(pick(a).note(a.card, a.text, by=a.by)))
+    b = pick(a)
+    warn_claim(b, a.card, a.by)
+    print(line(b.note(a.card, a.text, by=a.by)))
 
 
 def cmd_check(a):
-    print(line(pick(a).check(a.card, a.item, done=not a.undo, by=a.by)))
+    b = pick(a)
+    warn_claim(b, a.card, a.by)
+    print(line(b.check(a.card, a.item, done=not a.undo, by=a.by)))
 
 
 def cmd_summary(a):
@@ -234,8 +241,47 @@ def cmd_apply(a):
     print(f"applied {batch.run(b, ops, src, by=a.by)} op(s) to board {b.id} (src {src})")
 
 
+def agent_name(a):
+    name = getattr(a, "as_", None) or os.environ.get("DEVBOARD_AGENT")
+    if not name:
+        raise store.BoardError("say who you are: --as <agent-name> or DEVBOARD_AGENT=<agent-name> (e.g. codex-1)")
+    return name
+
+
+def warn_claim(b, cid, by):
+    """Writes on a card another agent claimed go through, with a warning: claims coordinate, never block."""
+    try:
+        c = b.card(cid).get("claimed_by")
+    except store.BoardError:
+        return
+    if c and c["agent"] != by:
+        print(f"warning: card {cid} is claimed by {c['agent']} until {c['until']}"
+              + (f" ({c['note']})" if c.get("note") else ""), file=sys.stderr)
+
+
+def cmd_claim(a):
+    print(line(pick(a).claim(a.card, agent_name(a), ttl=a.ttl, note=a.note, force=a.force)))
+
+
+def cmd_release(a):
+    print(line(pick(a).release(a.card, agent_name(a), note=a.note)))
+
+
+def cmd_who(a):
+    cs = pick(a).claims()
+    if a.json:
+        return out_json(cs)
+    for c in cs:
+        print(f"{c['card']:>4} {c['agent']} until {c['until'][:16].replace('T', ' ')}"
+              + (f" — {c['note']}" if c.get("note") else "") + f"  ({c['title']})")
+    if not cs:
+        print("nobody has claimed a card")
+
+
 def cmd_move(a):
-    print(line(pick(a).move(a.card, a.status, by=a.by)))
+    b = pick(a)
+    warn_claim(b, a.card, a.by)
+    print(line(b.move(a.card, a.status, by=a.by)))
 
 
 def cmd_inbox(a):
@@ -254,12 +300,16 @@ def cmd_reply(a):
 
 
 def cmd_attach(a):
-    f = pick(a).attach(a.card, a.path, link=a.link, by=a.by)
+    b = pick(a)
+    warn_claim(b, a.card, a.by)
+    f = b.attach(a.card, a.path, link=a.link, by=a.by)
     print(f"{a.card}: attached {f['name']} ({f['mode']}, {f['size']} B, sha1 {f['sha1'][:12]})")
 
 
 def cmd_detach(a):
-    pick(a).detach(a.card, a.name, by=a.by)
+    b = pick(a)
+    warn_claim(b, a.card, a.by)
+    b.detach(a.card, a.name, by=a.by)
     print(f"{a.card}: detached {a.name}")
 
 
@@ -286,7 +336,9 @@ def hint_line(bid, cs):
     doing = sum(c["column"] in ("doing", "final") for c in cs)
     blocked = sum(c["column"] == "blocked" for c in cs)
     waiting = sum(c.get("messages_open", 0) for c in cs)
+    claimed = sum(1 for c in cs if c.get("claimed_by"))
     inbox = f" · {waiting} messages for the agent (devboard.py inbox; answer them before moving on)" if waiting else ""
+    inbox += f" · {claimed} claimed by agents (devboard who)" if claimed else ""
     return (f"Board {bid}: {len(cs)} cards ({doing} in progress, {blocked} blocked){inbox} — "
             f"python3 {Path(__file__).resolve()} summary")
 
@@ -332,7 +384,8 @@ def cmd_hint(a):
 def build_parser():
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--board", help="board id (default: found from the current folder)")
-    common.add_argument("--by", default=os.environ.get("BOARD_ACTOR", "agent"), help="who writes (default agent)")
+    common.add_argument("--by", default=os.environ.get("DEVBOARD_AGENT") or os.environ.get("BOARD_ACTOR", "agent"),
+                        help="who writes (default: $DEVBOARD_AGENT, else agent)")
     common.add_argument("--json", action="store_true", help="machine-readable output")
 
     p = argparse.ArgumentParser(prog="devboard.py", description=__doc__,
@@ -404,6 +457,17 @@ def build_parser():
     sp = cmd("apply", cmd_apply, "run a batch of ops from a JSON file")
     sp.add_argument("file")
     sp.add_argument("--dry-run", action="store_true")
+    sp = cmd("claim", cmd_claim, "tell other agents you are working on a card (renew by claiming again)")
+    sp.add_argument("card")
+    sp.add_argument("--as", dest="as_", help="your agent name (default: $DEVBOARD_AGENT)")
+    sp.add_argument("--ttl", default=store.DEFAULT_TTL, help="how long the claim lasts: 30m, 2h, 1d (default 2h)")
+    sp.add_argument("--note", help="what you are doing, for the others")
+    sp.add_argument("--force", action="store_true", help="take over another agent's active claim (logged)")
+    sp = cmd("release", cmd_release, "drop your claim on a card")
+    sp.add_argument("card")
+    sp.add_argument("--as", dest="as_", help="your agent name (default: $DEVBOARD_AGENT)")
+    sp.add_argument("--note", help="handoff note for whoever picks it up")
+    cmd("who", cmd_who, "active claims: which agent works on which card")
     sp = cmd("move", cmd_move, "move a card to a column (leaving blocked clears the reason)")
     sp.add_argument("card")
     sp.add_argument("status", choices=COLUMNS)
@@ -440,7 +504,7 @@ def main(argv=None):
     a = build_parser().parse_args(argv)
     try:
         return a.fn(a) or 0
-    except store.Conflict as e:
+    except (store.Conflict, store.Claimed) as e:
         print(f"conflict: {e}", file=sys.stderr)
         return 3
     except store.BoardError as e:

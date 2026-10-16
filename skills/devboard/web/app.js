@@ -27,6 +27,7 @@ const I = {
   folder: SVG('<path d="M4 6a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/>'),
   repeat: SVG('<path d="M4 12V9a3 3 0 0 1 3-3h13l-3-3M20 12v3a3 3 0 0 1-3 3H4l3 3"/>'),
   box: SVG('<rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8M10 12h4"/>'),
+  bot: SVG('<rect x="5" y="8" width="14" height="11" rx="3"/><path d="M12 4v4M9 13h.01M15 13h.01M9.5 16h5"/>'),
   clip: SVG('<path d="m15 7-6.5 6.5a1.5 1.5 0 0 0 3 3L18 10a3 3 0 0 0-6-6l-6.5 6.5a4.5 4.5 0 0 0 9 9L21 13"/>'),
 };
 const DESC = (key) => (T[`desc.${key}`] ? t(`desc.${key}`) : "");
@@ -65,6 +66,7 @@ const fmtDate = (d) => {
 };
 const fmtSize = (n) => (n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : n >= 1024 ? `${Math.round(n / 1024)} KB` : `${num(n)} B`);
 const label = (id) => (/^\d+$/.test(id) ? t("stage", { id: esc(id) }) : esc(id));
+const hm = (ts) => String(ts || "").slice(11, 16);
 const pct = (c) => (c.progress == null ? "—" : `${num(c.progress)}%`);
 const colName = (k) => esc((S.data.board.columns || {})[k] || k);
 
@@ -148,6 +150,7 @@ function cardHtml(c, ro) {
   for (const tag of c.tags || []) chips += `<span class="crit">${esc(tag)}</span>`;
   if (c.messages_open) chips += `<span class="msg" title="${t("chip.messages")}">${I.msg} ${num(c.messages_open)}</span>`;
   if (c.files_count) chips += `<span class="clip" title="${t("chip.files")}">${I.clip} ${num(c.files_count)}</span>`;
+  if (c.claimed_by) chips += `<span class="agent" title="${t("chip.claimed", { agent: esc(c.claimed_by.agent), until: esc(hm(c.claimed_by.until)) })}">${I.bot} ${esc(c.claimed_by.agent)}</span>`;
   return `<a class="card${ro ? " ro" : ""}" href="${href(S.board, "card", c.id)}" data-id="${esc(c.id)}" draggable="${ro ? "false" : "true"}">
     <div class="chips">${chips}</div>
     <div class="ctitle">${esc(c.title)}</div>
@@ -215,6 +218,8 @@ function describe(ev) {
   if (ev.kind === "reply") return t("ev.reply", { text: esc(ev.note) });
   if (ev.kind === "attach") return t("ev.attach", { name: esc(ev.name) });
   if (ev.kind === "detach") return t("ev.detach", { name: esc(ev.name) });
+  if (ev.kind === "claim") return t(ev.forced_from ? "ev.claim_forced" : "ev.claim", { agent: esc(ev.agent), from: esc(ev.forced_from), until: esc(hm(ev.until)) }) + (ev.note ? ` · ${esc(ev.note)}` : "");
+  if (ev.kind === "release") return t("ev.release", { agent: esc(ev.agent) }) + (ev.note ? ` · ${esc(ev.note)}` : "");
   if (ev.kind === "check") {
     const item = String(ev.note || "").replace(/^\[[ x]\]\s*/, "");
     return t(ev.done ? "ev.check" : "ev.uncheck", { text: esc(item) });
@@ -269,6 +274,7 @@ async function renderCard(id) {
     <div class="kpis"><div class="kpi"><b>${t("kpi.progress")}</b><div>${progress}</div></div>
       <div class="kpi"><b>${t("kpi.estimate")}</b><div>${esc(c.estimate || "—")}${c.due ? ` · ${I.clock} ${fmtDate(c.due)}` : ""}</div></div>
       <div class="kpi"><b>${t("kpi.situation")}</b><div>${esc(c.situation || "—")}</div></div></div>
+    ${c.claimed_by ? `<div class="claim">${I.bot} ${t("card.claimed", { agent: esc(c.claimed_by.agent), until: esc(hm(c.claimed_by.until)) })}${c.claimed_by.note ? ` · ${esc(c.claimed_by.note)}` : ""}</div>` : ""}
     ${c.next ? `<div class="hl">${t("card.next", { text: esc(c.next) })}</div>` : ""}
     ${c.blocked ? `<div class="line bad">${I.minus} ${esc(c.blocked)}</div>` : ""}
     ${c.waiting ? `<div class="line">${I.wait} ${esc(c.waiting)}</div>` : ""}

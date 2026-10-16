@@ -11,6 +11,7 @@ import os
 import re
 import shutil
 import tempfile
+import time
 import unicodedata
 from datetime import date, datetime
 from pathlib import Path
@@ -44,6 +45,10 @@ class ReadOnly(BoardError):
     pass
 
 
+class Claimed(BoardError):
+    """Another agent holds an active claim on the card."""
+
+
 class Conflict(BoardError):
     def __init__(self, current):
         super().__init__("card changed since you read it; reload and retry")
@@ -54,6 +59,47 @@ def default_template():
     """$DEVBOARD_TEMPLATE, else the Portuguese `etapas` when DEVBOARD_LANG is pt-*, else `stages`."""
     lang = os.environ.get("DEVBOARD_LANG", "").lower()
     return os.environ.get("DEVBOARD_TEMPLATE") or ("etapas" if lang.startswith("pt") else "stages")
+
+
+AGENT_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$")
+TTL_RE = re.compile(r"^(\d+)([mhd])$")
+DEFAULT_TTL = "2h"
+
+
+def _now_ts():
+    return time.time()
+
+
+def _iso(ts):
+    return datetime.fromtimestamp(ts).astimezone().isoformat(timespec="seconds")
+
+
+def check_agent(name):
+    if not isinstance(name, str) or not AGENT_RE.match(name):
+        raise BoardError("agent name must be 1-40 letters, digits, '.', '_' or '-' (e.g. codex-1, claude-review)")
+    return name
+
+
+def parse_ttl(ttl):
+    m = TTL_RE.match(str(ttl or "").strip())
+    if not m or int(m.group(1)) <= 0:
+        raise BoardError("ttl must look like 30m, 2h or 1d")
+    return int(m.group(1)) * {"m": 60, "h": 3600, "d": 86400}[m.group(2)]
+
+
+def _claim(evs):
+    """The active claim of a card (agent, since, until, note), replayed from claim/release events."""
+    cur = None
+    for ev in evs:
+        if ev.get("kind") == "claim":
+            same = cur and cur["agent"] == ev.get("agent") and cur["until_ts"] > _ts(ev.get("ts"))
+            cur = {"agent": ev.get("agent"), "since": cur["since"] if same else ev.get("ts"),
+                   "until": ev.get("until"), "until_ts": ev.get("until_ts", 0), "note": ev.get("note")}
+        elif ev.get("kind") == "release":
+            cur = None
+    if cur and cur["until_ts"] > _now_ts():
+        return {k: v for k, v in cur.items() if k != "until_ts"}
+    return None
 
 
 def home():
@@ -267,7 +313,8 @@ class Board:
         return dict(card, progress=prog, progress_source=derive.progress_source(md),
                     checklist=[len(items), sum(1 for _, done, _ in items if done)] if (items := derive.checklist(md)) else None,
                     column=derive.column(card, prog), etag=etag,
-                    messages_open=sum(1 for m in _messages(evs) if m["open"]), files_count=len(_files(evs)))
+                    messages_open=sum(1 for m in _messages(evs) if m["open"]), files_count=len(_files(evs)),
+                    claimed_by=_claim(evs))
 
     def cards(self):
         return [self.card(c) for c in self.card_ids()]
@@ -390,6 +437,15 @@ class Board:
             out += [dict(m, card=cid, title=title) for m in _messages(self.events(cid)) if m["open"]]
         return sorted(out, key=lambda m: (_ts(m["ts"]), m["card"], m["n"]))
 
+    def claims(self):
+        """Active claims across the board: who is working on what, until when."""
+        out = []
+        for cid in self.card_ids():
+            c = _claim(self.events(cid))
+            if c:
+                out.append(dict(c, card=cid, title=self._read(cid)[0].get("title")))
+        return out
+
     def files(self, cid):
         self._read(cid)
         return _files(self.events(cid))
@@ -507,6 +563,38 @@ class Board:
         if status != "blocked" and self.card(cid)["column"] == "blocked":
             changes.update(blocked=None, waiting=None)
         return self.set(cid, changes, by=by, etag=etag, src=src)
+
+    def claim(self, cid, agent, ttl=DEFAULT_TTL, note=None, force=False, src=None):
+        """Tell other agents you are working on this card. Renewing your own claim extends it; another
+        agent's active claim refuses (Claimed) unless force=True, which is logged as forced_from."""
+        agent = check_agent(agent)
+        seconds = parse_ttl(ttl)
+        note = (note or "").strip() or None
+        with self._lock():
+            self._read(cid)
+            cur = _claim(self.events(cid))
+            extra = {}
+            if cur and cur["agent"] != agent:
+                if not force:
+                    raise Claimed(f"card {cid!r} is claimed by {cur['agent']} until {cur['until']}"
+                                  + (f" ({cur['note']})" if cur.get("note") else "") + "; pick another card or use --force")
+                extra["forced_from"] = cur["agent"]
+            until = _now_ts() + seconds
+            self._event(cid, agent, "claim", note=note, src=src, agent=agent, ttl=ttl,
+                        until=_iso(until), until_ts=until, **extra)
+        return self.card(cid)
+
+    def release(self, cid, agent, note=None, src=None):
+        agent = check_agent(agent)
+        with self._lock():
+            self._read(cid)
+            cur = _claim(self.events(cid))
+            if cur is None:
+                raise BoardError(f"card {cid!r} is not claimed")
+            if cur["agent"] != agent:
+                raise Claimed(f"card {cid!r} is claimed by {cur['agent']}, not {agent}")
+            self._event(cid, agent, "release", note=(note or "").strip() or None, src=src, agent=agent)
+        return self.card(cid)
 
     def message(self, cid, text, by="human", src=None):
         by = check_by(by)

@@ -99,6 +99,8 @@ class Handler(BaseHTTPRequestHandler):
                     return self._send(200, b.pending())
                 if rest == ["inbox"]:
                     return self._send(200, b.inbox())
+                if rest == ["claims"]:
+                    return self._send(200, b.claims())
                 if len(rest) == 4 and rest[0] == "cards" and rest[2] == "files":
                     return self._file(b.file_path(rest[1], rest[3]))
                 if len(rest) == 2 and rest[0] == "cards":
