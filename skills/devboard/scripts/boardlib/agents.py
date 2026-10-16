@@ -21,13 +21,16 @@ def snippet(cli_path):
 ## devboard — the project board
 
 This machine tracks development work with devboard (https://github.com/mindtec-victorf/devboard).
-In any folder that has a board:
+In any folder that has a board, follow this round:
 
-1. At the start of a session run `devboard hint`. If it prints a board, run `devboard inbox` and answer
-   every message with `devboard reply <card> <n> "what you did"` before anything else.
-2. Resume with `devboard summary` and `devboard show <card>`. Never read or edit the board files.
-3. Write only through the CLI: `set`, `note`, `check`, `move`, `attach`; many changes go in one `apply` file.
-4. Keep each card's next action and blockers current. `devboard --help` lists every command.
+1. Pick one name for the session and export it: `export DEVBOARD_AGENT=<tool>-<role>` (e.g. `codex-tests`).
+2. Run `devboard hint`. If it prints a board, run `devboard inbox` and answer every message with
+   `devboard reply <card> <n> "what you did"` before anything else.
+3. Run `devboard summary` and `devboard who`. Work only on a card nobody holds:
+   `devboard claim <card> --note "what you will do"` (claim again to renew; claims expire after 2 h).
+4. Record as you go, one command per fact: `note`, `check`, `attach`, `set --next/--situation/--wait`.
+   Never read or edit the board files; many changes go in one `apply` file.
+5. When you stop: `devboard release <card> --note "done / next / watch out"`. `devboard --help` lists everything.
 
 If `devboard` is not on the PATH, use `python3 "{cli_path}"` instead.
 {END}

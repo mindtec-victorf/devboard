@@ -1,4 +1,5 @@
 import json
+import os
 
 import pytest
 
@@ -55,4 +56,4 @@ def test_group_label_uses_tilde_for_home(tmp_path, monkeypatch):
     repo = tmp_path / "projetos" / "x"
     repo.mkdir(parents=True)
     store.Board.init("x", "X", [str(repo)])
-    assert {r["id"]: r for r in store.overview()}["x"]["group_label"] == "~/projetos/x"
+    assert {r["id"]: r for r in store.overview()}["x"]["group_label"] == os.path.join("~", "projetos", "x")

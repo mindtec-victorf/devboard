@@ -20,7 +20,7 @@ def run(*args, home, cwd=None):
 ])
 def test_setup_agent_global_files_are_idempotent(tmp_path, agent, where):
     code, out, _ = run("setup-agent", agent, home=tmp_path)
-    assert code == 0 and where in out
+    assert code == 0 and str(Path(where)) in out
     f = tmp_path / where
     text = f.read_text(encoding="utf-8")
     assert "<!-- devboard:start -->" in text and "devboard inbox" in text and "devboard hint" in text

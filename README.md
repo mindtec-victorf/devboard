@@ -32,6 +32,9 @@ cleanly. devboard replaces that file with structured, cheap state:
 
 - **Kanban that cannot lie.** The column is derived from the card (blocked → Blocked, 100% → Done,
   90–99% → Final touches…) unless a person pins it by dragging. A checklist drives the progress.
+- **Many agents, one board.** An agent `claim`s the card it works on; the others see it (`who`, the
+  page, the session-start line) and pick something else. Claims expire on their own, so a crashed
+  agent never locks a card, and `release --note` leaves a handoff for whoever comes next.
 - **Async messages.** People leave messages on cards; the agent runs `devboard.py inbox`, acts and
   `reply`s. The SessionStart hook tells the agent how many are waiting as soon as the session opens.
 - **Attachments.** PRDs, screenshots, PDFs, videos — copied into the board or linked in place
@@ -59,13 +62,22 @@ cleanly. devboard replaces that file with structured, cheap state:
 /plugin install devboard@devboard
 ```
 
-**Any other agent** — one line puts the `devboard` CLI on your `PATH` and wires up the agents it finds:
+**Any other agent** — one line puts the `devboard` CLI on your `PATH` and wires up the agents it finds.
+
+macOS and Linux:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/mindtec-victorf/devboard/main/install.sh | sh
 ```
 
-Requirements: Python 3.10+ as `python3` (and `git` for the installer).
+Windows (PowerShell):
+
+```powershell
+irm https://raw.githubusercontent.com/mindtec-victorf/devboard/main/install.ps1 | iex
+```
+
+Requirements: Python 3.10+ (`python3`, `python` or the Windows `py` launcher). `git` is used when
+present; on Windows the installer falls back to downloading a zip. Tested on Linux, macOS and Windows.
 
 ### Use with other agents
 
@@ -97,14 +109,31 @@ $DB serve            # http://127.0.0.1:8765/
 From then on, inside that repo, the agent finds the board from the current folder — no `--board`
 needed — and the SessionStart hook reminds it on every session.
 
-## How the agent works with it
+## How agents work with it
 
-The skill teaches a short cost law:
+The skill ships a working protocol, the same for every agent:
 
-1. Start every round with `devboard.py inbox`; answer each message with `devboard.py reply`.
-2. Resume with `summary`, then `show <card>` for the card at hand. Never read the board files.
-3. One command per update (`set`, `note`, `check`, `move`, `attach`); many changes → one `apply` file.
-4. Keep the next action, blockers and estimates current — that is what makes a card delegable.
+1. **Name yourself** once per session: `export DEVBOARD_AGENT=codex-tests`.
+2. **Inbox first:** `devboard inbox`, then `devboard reply <card> <n> "what you did"` for each message.
+3. **See the board:** `devboard summary` and `devboard who` (who holds which card).
+4. **Claim before you work:** `devboard claim <card> --note "what you will do"` — never a card someone
+   else holds. Claim again to renew.
+5. **Record as you go:** `note`, `check`, `attach`, `set --next/--situation/--wait`, one command per fact.
+6. **Hand off:** `devboard release <card> --note "done / next / watch out"`.
+
+### Multiple agents on one board
+
+```
+$ devboard who
+   3 claude-main until 18:30 — tuning the fraud threshold
+   6 codex-tests until 17:55 — load test at 2x Black Friday
+$ DEVBOARD_AGENT=claude-review devboard claim 3
+conflict: card '3' is claimed by claude-main until 2026-10-16T18:30:00-03:00 (tuning the fraud threshold); pick another card or use --force
+```
+
+A claim is a promise, not a lock: writes on someone else's card still go through, with a warning, so
+a person or an urgent fix is never blocked. `--force` takes a card over and is logged. Claims show on
+the page as a badge on the card and as "X is working on this until HH:MM" in the detail.
 
 ## CLI
 
@@ -112,6 +141,7 @@ The skill teaches a short cost law:
 |---|---|
 | `init <id> --title T --repo <folder>` | create a board (`--template stages`, or `etapas` in Portuguese) |
 | `add` · `set` · `note` · `check` · `move` | write cards |
+| `claim <card> [--as NAME --ttl 2h --note T]` · `release <card> [--note T]` · `who` | agent claims |
 | `inbox` · `reply <card> <n> "text"` | messages from people · answer and close one |
 | `attach <card> <file> [--link]` · `files` · `detach` | attachments |
 | `summary` · `show` · `history` · `pending` · `boards [--all]` | read (`--json` for scripts) |
@@ -148,7 +178,7 @@ Plain files: back them up, sync them, or put `~/.devboard` in a private repo of 
 | `DEVBOARD_LANG` | `en` | page language (`en`, `pt-BR`); `pt-BR` also makes `etapas` the default template |
 | `DEVBOARD_TEMPLATE` | `stages` | board template for `init` |
 | `DEVBOARD_ROLLOUTS` | `<home>/rollouts` | folders scanned for `*/STATUS.json` (`os.pathsep`-separated) |
-| `BOARD_ACTOR` | `agent` | the `by` recorded for CLI writes |
+| `DEVBOARD_AGENT` | — | your agent name: signs writes and claims (`claim` requires it or `--as`) |
 
 In Claude Code you can set them in `settings.json` under `"env"`.
 
@@ -157,6 +187,7 @@ In Claude Code you can set them in `settings.json` under `"env"`.
 The page is a local developer tool:
 
 - the server binds to `127.0.0.1` only and refuses any other `Host` header (DNS rebinding);
+- one writer per board at a time, across processes (`flock` on macOS/Linux, `msvcrt` on Windows);
 - every write needs an `X-Board: 1` header, which a cross-site form cannot send (CSRF);
 - attachments are served with `Content-Security-Policy: sandbox` and `nosniff`, so an attached HTML
   file cannot script the board (PDFs are exempt so the browser viewer works);

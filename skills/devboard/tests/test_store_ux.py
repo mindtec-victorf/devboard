@@ -88,7 +88,7 @@ def test_message_errors(board):
 def test_attach_copy_dedupes_name_and_records_hash(board, tmp_path):
     board.add("1", "A")
     f = tmp_path / "prd v1.md"
-    f.write_text("# PRD\n", encoding="utf-8")
+    f.write_bytes(b"# PRD\n")  # bytes: no newline translation on Windows
     a = board.attach("1", f)
     b = board.attach("1", f)
     assert a["name"] == "prd v1.md" and b["name"] == "prd v1-2.md"
