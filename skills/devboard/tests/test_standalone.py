@@ -40,7 +40,7 @@ def test_hook_prints_session_context_only_inside_a_board(tmp_path):
 
     def hook(cwd):
         r = subprocess.run([sys.executable, str(CLI), "hook"], input=json.dumps({"cwd": str(cwd), "source": "startup"}),
-                           capture_output=True, text=True, env=os.environ.copy())
+                           capture_output=True, text=True, encoding="utf-8", env=os.environ.copy())
         assert r.returncode == 0
         return r.stdout
 

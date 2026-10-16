@@ -51,6 +51,7 @@ def test_archived_board_no_longer_resolves(boards):
 
 def test_group_label_uses_tilde_for_home(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
     repo = tmp_path / "projetos" / "x"
     repo.mkdir(parents=True)
     store.Board.init("x", "X", [str(repo)])

@@ -10,8 +10,8 @@ CLI = ROOT / "skills" / "devboard" / "scripts" / "devboard.py"
 
 
 def run(*args, home, cwd=None):
-    env = dict(os.environ, HOME=str(home))
-    r = subprocess.run([sys.executable, str(CLI), *args], capture_output=True, text=True, env=env, cwd=cwd)
+    env = dict(os.environ, HOME=str(home), USERPROFILE=str(home))
+    r = subprocess.run([sys.executable, str(CLI), *args], capture_output=True, text=True, encoding="utf-8", env=env, cwd=cwd)
     return r.returncode, r.stdout, r.stderr
 
 

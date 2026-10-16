@@ -20,8 +20,10 @@ from . import derive
 
 try:
     import fcntl
-except ImportError:  # Windows: no advisory lock; one writer at a time is still safe
+    msvcrt = None
+except ImportError:  # Windows
     fcntl = None
+    import msvcrt
 
 ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,40}$")
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -278,15 +280,31 @@ class Board:
 
     @contextlib.contextmanager
     def _lock(self):
-        if fcntl is None:
-            yield
+        """One writer per board at a time, across threads and processes (flock on POSIX, msvcrt on Windows)."""
+        if fcntl is not None:
+            with open(self.dir / ".lock", "a") as fh:
+                fcntl.flock(fh, fcntl.LOCK_EX)
+                try:
+                    yield
+                finally:
+                    fcntl.flock(fh, fcntl.LOCK_UN)
             return
-        with open(self.dir / ".lock", "a") as fh:
-            fcntl.flock(fh, fcntl.LOCK_EX)
+        with open(self.dir / ".lock", "a+b") as fh:
+            fh.seek(0)
+            deadline = time.monotonic() + 30
+            while True:
+                try:
+                    msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
+                    break
+                except OSError:
+                    if time.monotonic() > deadline:
+                        raise BoardError("board is busy (another writer holds the lock for 30 s)") from None
+                    time.sleep(0.02)
             try:
                 yield
             finally:
-                fcntl.flock(fh, fcntl.LOCK_UN)
+                fh.seek(0)
+                msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
 
     # --- read ---
     def paths(self, cid):
