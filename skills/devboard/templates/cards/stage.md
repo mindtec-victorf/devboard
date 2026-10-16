@@ -6,6 +6,6 @@
 
 ## Checklist
 
-_(add `- [ ] ...` items; from then on the card's progress comes from here)_
+Add `- [ ]` items here. Once there is one, the card's progress comes from this list.
 
 ## Decisions

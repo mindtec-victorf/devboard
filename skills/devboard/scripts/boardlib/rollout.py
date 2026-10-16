@@ -2,7 +2,7 @@
 
 The ledger is {"meta": {"phases"|"fases": [...], "project"|"projeto": ...},
 "units"|"unidades": {id: {"phase"|"fase", "status", "blockers"|"bloqueios", "result"|"resultado", "ts"}}}.
-Both the English keys and the Portuguese ones written by the original rollout kit are read.
+The key names of the original rollout kit (fases, unidades, fase, bloqueios, resultado) are read too.
 
 Sources, in this order: <dir>/*/STATUS.json for each dir in rollout_dirs() (sorted), then the paths in
 <board home>/_rollouts.json (written by `devboard.py link-rollout`). Board id =

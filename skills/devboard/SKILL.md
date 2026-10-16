@@ -102,7 +102,7 @@ devboard release 6 --note "baseline in the card; next: cache on, same script (sc
 
 | Command | Use |
 |---|---|
-| `init <id> --title T --repo <folder>` | new board (`--template stages`; `etapas` in Portuguese) |
+| `init <id> --title T --repo <folder>` | new board (`--template stages`) |
 | `add <card> --title T [--priority N --tag T --estimate T --due D --next T --md-file F]` | new card |
 | `set <card> [--progress N --start --block T/--unblock --wait T/--unwait --next T --situation T --status S] [--note T]` | change fields |
 | `note` · `check <card> <n> [--undo]` · `move <card> <column>` | milestone · tick item n · pin the column |
@@ -131,7 +131,7 @@ Batch file for `apply`:
 Data: `$DEVBOARD_HOME` (default `~/.devboard`) — `<board>/board.json`, `cards/<id>.{json,md,jsonl}`,
 `files/<id>/`, `_archive.jsonl`, `rollouts/*/STATUS.json`. The page: `devboard serve` →
 `http://127.0.0.1:8765/` (people drag cards, tick the checklist, attach files, leave messages, see who
-holds what). UI language: `DEVBOARD_LANG` (`en`, `pt-BR`).
+holds what). UI language: `DEVBOARD_LANG` (translations in `web/i18n/`).
 
 ## Starting from an existing progress file
 

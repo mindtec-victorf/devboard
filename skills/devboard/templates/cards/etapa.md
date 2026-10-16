@@ -6,6 +6,6 @@
 
 ## Checklist
 
-_(itens `- [ ] ...`; o progresso do card passa a vir daqui)_
+Adicione itens `- [ ]` aqui. A partir do primeiro, o progresso do card vem desta lista.
 
 ## Decisões

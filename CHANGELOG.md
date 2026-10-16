@@ -15,4 +15,4 @@
 
 ## 0.1.0
 - First public release: board, home screen, async messages, attachments, rollout ledgers, SessionStart hook,
-  English and Brazilian Portuguese UI.
+  translatable UI.

@@ -58,7 +58,7 @@ class Conflict(BoardError):
 
 
 def default_template():
-    """$DEVBOARD_TEMPLATE, else the Portuguese `etapas` when DEVBOARD_LANG is pt-*, else `stages`."""
+    """$DEVBOARD_TEMPLATE, else `etapas` when DEVBOARD_LANG starts with "pt", else `stages`."""
     lang = os.environ.get("DEVBOARD_LANG", "").lower()
     return os.environ.get("DEVBOARD_TEMPLATE") or ("etapas" if lang.startswith("pt") else "stages")
 
@@ -74,6 +74,12 @@ def _now_ts():
 
 def _iso(ts):
     return datetime.fromtimestamp(ts).astimezone().isoformat(timespec="seconds")
+
+
+def short_time(iso):
+    """HH:MM for today, YYYY-MM-DD HH:MM otherwise: what people read in messages and lists."""
+    text = str(iso or "")
+    return text[11:16] if text[:10] == _iso(_now_ts())[:10] else text[:16].replace("T", " ")
 
 
 def check_agent(name):
@@ -594,7 +600,7 @@ class Board:
             extra = {}
             if cur and cur["agent"] != agent:
                 if not force:
-                    raise Claimed(f"card {cid!r} is claimed by {cur['agent']} until {cur['until']}"
+                    raise Claimed(f"card {cid!r} is claimed by {cur['agent']} until {short_time(cur['until'])}"
                                   + (f" ({cur['note']})" if cur.get("note") else "") + "; pick another card or use --force")
                 extra["forced_from"] = cur["agent"]
             until = _now_ts() + seconds

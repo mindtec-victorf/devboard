@@ -1,221 +1,258 @@
-# devboard
+<h1 align="center">devboard</h1>
 
-**One local board for all your development work — that your AI agent keeps up to date, and you drive from a page.**
+<p align="center"><strong>A local Kanban board that your AI agents keep up to date.</strong></p>
+<p align="center">They track the work. You see it at a glance, drag cards and leave them messages.</p>
 
-devboard is a [Claude Code](https://claude.com/claude-code) plugin that also works with Codex, Gemini CLI,
-Cursor, GitHub Copilot and any agent that reads `AGENTS.md`. Each project gets a Kanban board:
-cards with a checklist, an append-only history, attachments and messages. Your agent updates it with
-one deterministic command per change. You open `localhost`, drag cards, tick boxes, drop in a PRD or a
-video, and leave a message. The agent reads your messages at the start of its next round and answers
-them on the card.
+<p align="center">
+  <a href="https://github.com/mindtec-victorf/devboard/actions/workflows/tests.yml"><img src="https://github.com/mindtec-victorf/devboard/actions/workflows/tests.yml/badge.svg" alt="tests"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license"></a>
+  <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey" alt="macOS, Linux, Windows">
+  <img src="https://img.shields.io/badge/python-3.10%2B-blue" alt="Python 3.10+">
+</p>
 
-You stop re-explaining where things are. Any session — today, after a `/clear`, next week, in another
-repo — resumes from the board in a few hundred tokens.
+![devboard: drag a card, leave a message, the agent claims the card and answers](docs/screenshots/demo.gif)
 
-![The board](docs/screenshots/board.png)
+---
+
+> **devboard** gives every project a board of cards with checklists, history, attachments and
+> messages. Agents update it from the command line; you use it in the browser.
 
 ## Why
 
-Long projects usually track progress in a Markdown file that only grows. The agent re-reads all of it
-to resume and edits free text to update it; you can't see the state at a glance or hand work off
-cleanly. devboard replaces that file with structured, cheap state:
+Long projects with AI agents lose track of themselves. Each new session starts by re-reading a
+growing progress file or by you explaining, again, where things stand.
 
-| | Progress file | devboard |
-|---|---|---|
-| Resume | read the whole file (thousands of tokens) | `devboard.py summary` — one line per card |
-| Update | edit free text | one command, validated, logged |
-| See the state | scroll | a board, a home screen with all boards |
-| Talk to the agent | in the chat, now | a message on the card, answered on its next round |
-| Prove what happened | git blame on prose | every change is an event with author, time and diff; `audit` replays it |
+devboard replaces that with a board:
+
+- **Agents resume in seconds.** One command prints one line per card instead of a page of notes.
+- **You talk to them without being in the chat.** Leave a message on a card; the agent answers it at
+  the start of its next session.
+- **Several agents can share a project.** Each one claims the card it works on, so the others pick
+  something else.
 
 ## Features
 
-- **Kanban that cannot lie.** The column is derived from the card (blocked → Blocked, 100% → Done,
-  90–99% → Final touches…) unless a person pins it by dragging. A checklist drives the progress.
-- **Many agents, one board.** An agent `claim`s the card it works on; the others see it (`who`, the
-  page, the session-start line) and pick something else. Claims expire on their own, so a crashed
-  agent never locks a card, and `release --note` leaves a handoff for whoever comes next.
-- **Async messages.** People leave messages on cards; the agent runs `devboard.py inbox`, acts and
-  `reply`s. The SessionStart hook tells the agent how many are waiting as soon as the session opens.
-- **Attachments.** PRDs, screenshots, PDFs, videos — copied into the board or linked in place
-  (`--link`), with size and SHA-1 in the history. Images and videos preview inline.
-- **One door for every write.** CLI and page go through the same store: lock → validate → etag check
-  → atomic write → one event. Concurrent edits get a 409 instead of a silent overwrite.
-- **Deterministic and auditable.** Canonical JSON (same content, same bytes). `apply` runs a batch of
-  operations validated up front — one bad op, zero writes; the same file builds the same board.
-  `audit` replays the history and flags any edit that bypassed the CLI.
-- **Home screen.** Every board grouped by its origin repository, newest activity first, archive and
-  unarchive. Rollout ledgers (`STATUS.json`) show up read-only.
-- **Zero dependencies.** Python 3.10+ standard library and one HTML/JS/CSS page. No build, no CDN,
-  no database. English and Brazilian Portuguese UI.
+- 🤖 **Works with Claude Code, Codex, Gemini CLI, Cursor, GitHub Copilot** and any agent that reads `AGENTS.md`
+- 🗂️ **Kanban in the browser.** Drag cards between columns, tick checklists, search, filter by priority
+- 💬 **Messages to your agents.** They read them first thing and reply on the card
+- 🙋 **Claims.** An agent marks the card it is working on; claims expire on their own
+- 📎 **Attachments.** PRDs, screenshots, PDFs and videos, with previews
+- 🧾 **Full history.** Every change records who made it and when; `devboard audit` checks nothing was edited by hand
+- 🏠 **All your projects on one screen,** grouped by repository, with archiving
+- 🔒 **Local and private.** Plain files in `~/.devboard`, a page on `127.0.0.1`, no account, no cloud
+- 🪶 **No dependencies.** Python 3.10+ and a browser
 
-| Card detail | Home |
-|---|---|
-| ![Card](docs/screenshots/card.png) | ![Home](docs/screenshots/home.png) |
+## Getting started
 
-## Install
+### 1. Install
 
-**Claude Code** — the plugin brings the skill and a SessionStart hook:
+**Claude Code** (recommended, includes the session-start reminder):
 
 ```
 /plugin marketplace add mindtec-victorf/devboard
 /plugin install devboard@devboard
 ```
 
-**Any other agent** — one line puts the `devboard` CLI on your `PATH` and wires up the agents it finds.
-
-macOS and Linux:
+**Codex, Gemini CLI, Cursor, Copilot and others:**
 
 ```bash
+# macOS and Linux
 curl -fsSL https://raw.githubusercontent.com/mindtec-victorf/devboard/main/install.sh | sh
 ```
 
-Windows (PowerShell):
-
 ```powershell
+# Windows (PowerShell)
 irm https://raw.githubusercontent.com/mindtec-victorf/devboard/main/install.ps1 | iex
 ```
 
-Requirements: Python 3.10+ (`python3`, `python` or the Windows `py` launcher). `git` is used when
-present; on Windows the installer falls back to downloading a zip. Tested on Linux, macOS and Windows.
+The installer puts a `devboard` command on your `PATH` and sets up the agents it finds.
+[Details per agent](#supported-agents). Claude Code users can run it too, to get the `devboard`
+command in their own terminal.
 
-### Use with other agents
+### 2. Create a board
 
-| Agent | What the installer does | Per project |
-|---|---|---|
-| Claude Code | — use the plugin above | nothing |
-| OpenAI Codex | links the skill into `~/.codex/skills/` and writes a block in `~/.codex/AGENTS.md` | nothing |
-| GitHub Copilot | links the skill into `~/.copilot/skills/` | `devboard setup-agent copilot` → `.github/copilot-instructions.md` |
-| Gemini CLI | writes a block in `~/.gemini/GEMINI.md` | nothing |
-| Cursor | — | `devboard setup-agent cursor` → `.cursor/rules/devboard.mdc` |
-| Anything else | — | `devboard setup-agent agents` → `AGENTS.md`, or `--print` to paste it anywhere |
+Ask your agent: *"Create a devboard for this project, one card per stage."*
 
-The block is short and idempotent (between `<!-- devboard:start/end -->` markers, so re-running replaces
-it). Agents without a SessionStart hook are told to run `devboard hint` and `devboard inbox` when a
-session starts — the same thing the Claude Code hook does for you.
-
-## Quickstart
-
-Ask your agent: *"set up a devboard for this project"*. Or by hand:
+Or do it yourself, from the project folder:
 
 ```bash
-DB="python3 <plugin dir>/skills/devboard/scripts/devboard.py"
-$DB init checkout --title "Acme Checkout · v2 launch" --repo .
-$DB add 3 --title "Fraud checks" --priority 1 --next "wire the risk score API"
-$DB set 3 --start --note "phase 1 merged"
-$DB serve            # http://127.0.0.1:8765/
+devboard init checkout --title "Checkout v2" --repo .
+devboard add 1 --title "Payments API" --next "write the refund endpoint"
+devboard add 2 --title "Fraud checks" --priority 1
 ```
 
-From then on, inside that repo, the agent finds the board from the current folder — no `--board`
-needed — and the SessionStart hook reminds it on every session.
+### 3. Open it
 
-## How agents work with it
+Ask your agent to *"open the devboard"*, or run:
 
-The skill ships a working protocol, the same for every agent:
-
-1. **Name yourself** once per session: `export DEVBOARD_AGENT=codex-tests`.
-2. **Inbox first:** `devboard inbox`, then `devboard reply <card> <n> "what you did"` for each message.
-3. **See the board:** `devboard summary` and `devboard who` (who holds which card).
-4. **Claim before you work:** `devboard claim <card> --note "what you will do"` — never a card someone
-   else holds. Claim again to renew.
-5. **Record as you go:** `note`, `check`, `attach`, `set --next/--situation/--wait`, one command per fact.
-6. **Hand off:** `devboard release <card> --note "done / next / watch out"`.
-
-### Multiple agents on one board
-
+```bash
+devboard serve
 ```
+
+Then go to <http://127.0.0.1:8765>.
+
+## Working with AI agents
+
+The skill teaches every agent the same routine:
+
+1. **Pick a name** for the session: `export DEVBOARD_AGENT=codex-tests`.
+2. **Read your messages first:** `devboard inbox`, then `devboard reply <card> <n> "what I did"`.
+3. **Look at the board:** `devboard summary` and `devboard who`.
+4. **Claim a free card:** `devboard claim <card> --note "what I'm about to do"`.
+5. **Record progress as it happens:** `devboard note`, `devboard check`, `devboard attach`, `devboard set --next`.
+6. **Hand off when done:** `devboard release <card> --note "done / next / watch out"`.
+
+In Claude Code, the plugin reminds the agent at the start of each session that a board exists and how
+many messages are waiting.
+
+### Several agents at once
+
+```console
 $ devboard who
-   3 claude-main until 18:30 — tuning the fraud threshold
-   6 codex-tests until 17:55 — load test at 2x Black Friday
+   3 claude-main until 18:30 — tuning the fraud threshold  (Fraud checks)
+   6 codex-tests until 17:55 — load test at 2x Black Friday  (Load testing)
+
 $ DEVBOARD_AGENT=claude-review devboard claim 3
-conflict: card '3' is claimed by claude-main until 2026-10-16T18:30:00-03:00 (tuning the fraud threshold); pick another card or use --force
+conflict: card '3' is claimed by claude-main until 18:30 (tuning the fraud threshold); pick another card or use --force
 ```
 
-A claim is a promise, not a lock: writes on someone else's card still go through, with a warning, so
-a person or an urgent fix is never blocked. `--force` takes a card over and is logged. Claims show on
-the page as a badge on the card and as "X is working on this until HH:MM" in the detail.
+A claim lasts 2 hours unless the agent renews it, so an agent that crashes never blocks a card.
+Claims coordinate; they don't lock anything. You can still change any card from the page.
 
-## CLI
+## Working in the browser
+
+| Board | Card |
+|---|---|
+| ![Board](docs/screenshots/board.png) | ![Card](docs/screenshots/card.png) |
+
+- **Drag** a card to change its column.
+- **Tick** checklist items; the progress bar follows.
+- **Drop files** on a card to attach them.
+- **Leave a message** for the agent; you'll see its reply on the card.
+- **See who** is working on a card, until when, and why.
+
+The home screen lists every board you have, grouped by repository:
+
+![Home screen](docs/screenshots/home.png)
+
+## Supported agents
+
+| Agent | Setup |
+|---|---|
+| Claude Code | The plugin ([install](#1-install)). Nothing else to do. |
+| OpenAI Codex | The installer adds the skill to `~/.codex/skills` and instructions to `~/.codex/AGENTS.md`. |
+| Gemini CLI | The installer adds instructions to `~/.gemini/GEMINI.md`. |
+| GitHub Copilot | The installer adds the skill to `~/.copilot/skills`. In each project: `devboard setup-agent copilot`. |
+| Cursor | In each project: `devboard setup-agent cursor`. |
+| Anything else | In each project: `devboard setup-agent agents` writes `AGENTS.md`. `--print` shows the text to paste elsewhere. |
+
+Running `setup-agent` again updates the instructions in place.
+
+## Reference
+
+<details>
+<summary><strong>Commands</strong></summary>
 
 | Command | What it does |
 |---|---|
-| `init <id> --title T --repo <folder>` | create a board (`--template stages`, or `etapas` in Portuguese) |
-| `add` · `set` · `note` · `check` · `move` | write cards |
-| `claim <card> [--as NAME --ttl 2h --note T]` · `release <card> [--note T]` · `who` | agent claims |
-| `inbox` · `reply <card> <n> "text"` | messages from people · answer and close one |
-| `attach <card> <file> [--link]` · `files` · `detach` | attachments |
-| `summary` · `show` · `history` · `pending` · `boards [--all]` | read (`--json` for scripts) |
-| `apply <ops.json> [--dry-run]` | batch of operations, validated before any write |
-| `validate` · `audit` | health check · replay history against the files |
-| `archive` · `unarchive` | hide a finished board (data stays) |
-| `link-rollout <STATUS.json>` | show a rollout ledger from anywhere, read-only |
-| `serve [--port 8765]` | the page |
-| `hint` · `setup-agent <codex/gemini/cursor/copilot/agents>` | session-start line · instructions for other agents |
+| `init <id> --title T --repo <folder>` | Create a board linked to a folder |
+| `add <card> --title T` | Add a card (`--priority`, `--tag`, `--estimate`, `--due`, `--next`) |
+| `set <card> ...` | Change a card (`--progress`, `--block`, `--wait`, `--next`, `--status`, `--note`) |
+| `note <card> "text"` | Record a milestone |
+| `check <card> <n>` | Tick checklist item *n* (`--undo` to untick) |
+| `move <card> <column>` | Move a card: `todo`, `blocked`, `doing`, `final`, `done` |
+| `claim <card>` · `release <card>` · `who` | Claim a card, release it, list claims |
+| `inbox` · `reply <card> <n> "text"` | Read messages · answer one |
+| `attach <card> <file>` · `files <card>` · `detach <card> <name>` | Attachments (`--link` keeps the file where it is) |
+| `summary` · `show <card>` · `history` · `pending` | Read the board (`--json` for scripts) |
+| `boards` · `archive <id>` · `unarchive <id>` | Manage boards |
+| `apply <file.json>` | Run many changes at once; nothing is written if one is invalid |
+| `validate` · `audit` | Check the files · check the history matches them |
+| `serve` | Start the page (`--port`, default 8765) |
+| `hint` · `setup-agent <agent>` | One-line status for this folder · instructions for an agent |
 
-Every command has `--help`. Exit codes: 0 ok · 1 findings (`validate`/`audit`) · 2 usage error · 3 conflict.
+Every command has `--help`. Exit codes: `0` ok, `1` problems found, `2` usage error, `3` conflict.
 
-## Data
+</details>
 
-Everything lives in `~/.devboard/`, never inside your repositories:
+<details>
+<summary><strong>Configuration</strong></summary>
 
-```
-~/.devboard/<board>/board.json         title, linked repos, column labels
-~/.devboard/<board>/cards/<id>.json    short fields
-~/.devboard/<board>/cards/<id>.md      long text: goal, context, checklist, decisions
-~/.devboard/<board>/cards/<id>.jsonl   history, append-only
-~/.devboard/<board>/files/<id>/        copied attachments
-~/.devboard/_archive.jsonl             archive log
-~/.devboard/rollouts/*/STATUS.json     rollout ledgers (read-only)
-```
-
-Plain files: back them up, sync them, or put `~/.devboard` in a private repo of its own.
-
-## Configuration
-
-| Variable | Default | Meaning |
+| Variable | Default | What it sets |
 |---|---|---|
-| `DEVBOARD_HOME` | `~/.devboard` | where boards live |
-| `DEVBOARD_LANG` | `en` | page language (`en`, `pt-BR`); `pt-BR` also makes `etapas` the default template |
-| `DEVBOARD_TEMPLATE` | `stages` | board template for `init` |
-| `DEVBOARD_ROLLOUTS` | `<home>/rollouts` | folders scanned for `*/STATUS.json` (`os.pathsep`-separated) |
-| `DEVBOARD_AGENT` | — | your agent name: signs writes and claims (`claim` requires it or `--as`) |
+| `DEVBOARD_HOME` | `~/.devboard` | Where boards are stored |
+| `DEVBOARD_AGENT` | — | The agent's name, used for claims and to sign changes |
+| `DEVBOARD_LANG` | `en` | Language of the page |
+| `DEVBOARD_TEMPLATE` | `stages` | Template used by `init` |
+| `DEVBOARD_ROLLOUTS` | `~/.devboard/rollouts` | Folders scanned for rollout ledgers |
 
-In Claude Code you can set them in `settings.json` under `"env"`.
+In Claude Code you can set them in `settings.json`, under `"env"`.
 
-## Security model
+</details>
 
-The page is a local developer tool:
+<details>
+<summary><strong>Where the data lives</strong></summary>
 
-- the server binds to `127.0.0.1` only and refuses any other `Host` header (DNS rebinding);
-- one writer per board at a time, across processes (`flock` on macOS/Linux, `msvcrt` on Windows);
-- every write needs an `X-Board: 1` header, which a cross-site form cannot send (CSRF);
-- attachments are served with `Content-Security-Policy: sandbox` and `nosniff`, so an attached HTML
-  file cannot script the board (PDFs are exempt so the browser viewer works);
-- attachment names are sanitized (path, control and invisible characters, Windows device names).
+Everything is plain files under `~/.devboard`, never inside your repositories:
 
-There is no authentication against other users on the same machine; don't run it on a shared host.
+```
+~/.devboard/<board>/board.json         board title, linked folders, columns
+~/.devboard/<board>/cards/<id>.json    card fields
+~/.devboard/<board>/cards/<id>.md      long text: goal, context, checklist, decisions
+~/.devboard/<board>/cards/<id>.jsonl   history (append-only)
+~/.devboard/<board>/files/<id>/        attachments
+```
 
-## Rollout ledgers
+Back it up, sync it, or keep it in a private Git repository.
 
-For work applied across many units (repositories, tickets), a ledger `STATUS.json` with
-`{"meta": {"phases": [...]}, "units": {id: {"phase", "status", "blockers", "result"}}}` shows up as a
-read-only board, one card per unit and one column per phase. Portuguese keys (`fases`, `unidades`,
-`fase`, `bloqueios`, `resultado`) are read too.
+</details>
+
+<details>
+<summary><strong>Security</strong></summary>
+
+devboard is a local tool for one person's machine.
+
+- The page only listens on `127.0.0.1` and rejects requests for any other host name.
+- Changes from the page need a header that other websites cannot send.
+- Attachments open in a sandbox, so an attached HTML file can't act on the board.
+- Attachment names are cleaned of paths and unsafe characters.
+
+There are no user accounts. Don't run `devboard serve` on a shared server.
+
+</details>
+
+<details>
+<summary><strong>Rollout ledgers</strong></summary>
+
+If you apply one change across many repositories or tickets, a `STATUS.json` ledger shows up as a
+read-only board, one card per unit and one column per phase:
+
+```json
+{"meta": {"project": "Upgrade logging", "phases": ["read", "apply", "done"]},
+ "units": {"billing-api": {"phase": "apply", "status": "in_progress", "blockers": [], "result": {"tests": "41/41"}}}}
+```
+
+Put it in `~/.devboard/rollouts/<name>/STATUS.json`, or run `devboard link-rollout <path>`.
+
+</details>
 
 ## Development
 
 ```bash
-cd skills/devboard
-python3 -m pytest -q          # browser tests run when Playwright + Chromium are installed
-python3 ../../docs/make-screenshots.py   # rebuild the README screenshots from docs/demo/
+git clone https://github.com/mindtec-victorf/devboard && cd devboard/skills/devboard
+python3 -m pytest -q                      # browser tests run if Playwright is installed
+python3 ../../docs/make-screenshots.py    # rebuild the images in this README
 ```
+
+Tests run on Linux, macOS and Windows on every push.
 
 ## Credits
 
-The concept and the visual design come from **Rogério Dornelas**: a development-only progress page that
-reads a JSON the AI keeps updated, which he shared with the team. devboard turns that idea into a
-reusable plugin. Nunito Sans © The Nunito Sans Project Authors (SIL Open Font License 1.1).
+The idea and the design come from **Rogério Dornelas**, who built a development-only page that shows
+a JSON file his AI agent keeps updated. devboard turns it into a plugin anyone can install.
+
+Font: Nunito Sans, © The Nunito Sans Project Authors, SIL Open Font License 1.1.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+[MIT](LICENSE)

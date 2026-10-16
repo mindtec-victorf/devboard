@@ -65,3 +65,12 @@ def test_claims_do_not_disturb_audit(board):
     board.claim("1", "codex-1")
     board.release("1", "codex-1")
     assert board.audit() == {}
+
+
+def test_times_are_short_and_readable(board):
+    board.claim("1", "codex-1", note="x")
+    until = board.card("1")["claimed_by"]["until"]
+    with pytest.raises(store.Claimed) as e:
+        board.claim("1", "claude-a")
+    assert f"until {until[11:16]} (x)" in str(e.value) and "T" not in str(e.value).split("until ")[1][:6]
+    assert store.short_time("2001-02-03T04:05:06-03:00") == "2001-02-03 04:05"

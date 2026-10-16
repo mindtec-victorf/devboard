@@ -40,7 +40,7 @@ def line(c):
     if c.get("files_count"):
         s += f" | files: {c['files_count']}"
     if c.get("claimed_by"):
-        s += f" | claimed: {c['claimed_by']['agent']} (until {c['claimed_by']['until'][11:16]})"
+        s += f" | claimed: {c['claimed_by']['agent']} (until {store.short_time(c['claimed_by']['until'])})"
     return s
 
 
@@ -255,7 +255,7 @@ def warn_claim(b, cid, by):
     except store.BoardError:
         return
     if c and c["agent"] != by:
-        print(f"warning: card {cid} is claimed by {c['agent']} until {c['until']}"
+        print(f"warning: card {cid} is claimed by {c['agent']} until {store.short_time(c['until'])}"
               + (f" ({c['note']})" if c.get("note") else ""), file=sys.stderr)
 
 
@@ -272,7 +272,7 @@ def cmd_who(a):
     if a.json:
         return out_json(cs)
     for c in cs:
-        print(f"{c['card']:>4} {c['agent']} until {c['until'][:16].replace('T', ' ')}"
+        print(f"{c['card']:>4} {c['agent']} until {store.short_time(c['until'])}"
               + (f" — {c['note']}" if c.get("note") else "") + f"  ({c['title']})")
     if not cs:
         print("nobody has claimed a card")
@@ -428,7 +428,7 @@ def build_parser():
     sp.add_argument("id")
     sp.add_argument("--title", required=True)
     sp.add_argument("--repo", action="append", default=[], help="folder linked to the board (repeatable)")
-    sp.add_argument("--template", help="board template (default: stages; etapas when DEVBOARD_LANG=pt-BR)")
+    sp.add_argument("--template", help="board template from templates/boards/ (default: stages)")
     sp = cmd("add", cmd_add, "create a card")
     sp.add_argument("card")
     sp.add_argument("--md-file", help="initial .md (default: the board's card template)")
