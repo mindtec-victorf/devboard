@@ -21,9 +21,9 @@ STATIC = {
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
     "/app.css": ("app.css", "text/css; charset=utf-8"),
     "/fonts/nunito-sans.woff2": ("fonts/nunito-sans.woff2", "font/woff2"),
-    **{f"/i18n/{lang}.json": (f"i18n/{lang}.json", "application/json; charset=utf-8") for lang in ("en", "pt-BR")},
+    "/favicon.svg": ("favicon.svg", "image/svg+xml"),
 }
-LANGS = ("en", "pt-BR")
+LANG_RE = re.compile(r"^/i18n/([A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,4})?)\.json$")
 MAX_BODY = 256_000
 MAX_UPLOAD = 2 * 1024 ** 3  # 2 GiB: videos fit; bigger files go in with `devboard.py attach --link`
 # Text formats browsers would download (text/markdown, text/yaml...) are shown inline as plain text.
@@ -31,13 +31,20 @@ TEXT_EXT = {".md", ".markdown", ".txt", ".log", ".json", ".jsonl", ".csv", ".yam
 RANGE_RE = re.compile(r"^bytes=(\d*)-(\d*)$")
 
 
+def languages():
+    """Every web/i18n/<lang>.json is a language: adding one is dropping a file there."""
+    found = sorted(p.stem for p in (WEB / "i18n").glob("*.json"))
+    return ["en"] + [x for x in found if x != "en"]
+
+
 def config():
-    """What the page needs before rendering: UI language ($DEVBOARD_LANG, en fallback) and the data folder."""
-    want = os.environ.get("DEVBOARD_LANG", "en")
-    lang = next((x for x in LANGS if x.lower() == want.lower()), None) or \
-        next((x for x in LANGS if x.split("-")[0] == want.split("-")[0].lower()), "en")
+    """What the page needs before rendering: UI language ($DEVBOARD_LANG, best match, en fallback),
+    the languages available and the data folder."""
+    langs, want = languages(), os.environ.get("DEVBOARD_LANG", "en").lower()
+    lang = next((x for x in langs if x.lower() == want), None) or \
+        next((x for x in langs if x.split("-")[0].lower() == want.split("-")[0]), "en")
     home_dir, data = str(Path.home()), str(store.home())
-    return {"lang": lang, "home": "~" + data[len(home_dir):] if data.startswith(home_dir) else data}
+    return {"lang": lang, "langs": langs, "home": "~" + data[len(home_dir):] if data.startswith(home_dir) else data}
 
 
 def _int(q, key, default):
@@ -81,6 +88,9 @@ class Handler(BaseHTTPRequestHandler):
         if path in STATIC:
             name, ctype = STATIC[path]
             return self._send(200, (WEB / name).read_bytes(), ctype)
+        m = LANG_RE.match(path)
+        if m and m.group(1) in languages():
+            return self._send(200, (WEB / "i18n" / f"{m.group(1)}.json").read_bytes(), "application/json; charset=utf-8")
         try:
             if parts == ["api", "config"]:
                 return self._send(200, config())

@@ -8,7 +8,7 @@ const enc = encodeURIComponent;
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
-const S = { boards: [], board: null, data: null, rev: null, card: null, inbox: 0, showArchived: false, cfg: { lang: "en", home: "~/.devboard" } };
+const S = { boards: [], board: null, data: null, rev: null, card: null, inbox: 0, showArchived: false, moved: null, cfg: { lang: "en", home: "~/.devboard" } };
 const T = {};
 const t = (key, vars = {}) => String(T[key] ?? key).replace(/\{(\w+)\}/g, (_, k) => (k in vars ? vars[k] : ""));
 
@@ -67,6 +67,19 @@ const fmtDate = (d) => {
 const fmtSize = (n) => (n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : n >= 1024 ? `${Math.round(n / 1024)} KB` : `${num(n)} B`);
 const label = (id) => (/^\d+$/.test(id) ? t("stage", { id: esc(id) }) : esc(id));
 const hm = (ts) => String(ts || "").slice(11, 16);
+// "5 min ago", "yesterday"...; the exact date stays in the title attribute
+function rel(ts) {
+  const d = new Date(ts);
+  if (!ts || Number.isNaN(d.getTime())) return esc(ts || "—");
+  const s = (Date.now() - d.getTime()) / 1000;
+  if (s < 60) return t("time.just_now");
+  if (s < 3600) return t("time.min", { n: Math.floor(s / 60) });
+  if (s < 86400) return t("time.hours", { n: Math.floor(s / 3600) });
+  if (s < 172800) return t("time.yesterday");
+  if (s < 7 * 86400) return t("time.days", { n: Math.floor(s / 86400) });
+  return fmtDate(ts);
+}
+const when = (ts) => `<time title="${fmtDate(ts)} ${esc(hm(ts))}">${rel(ts)}</time>`;
 const pct = (c) => (c.progress == null ? "—" : `${num(c.progress)}%`);
 const colName = (k) => esc((S.data.board.columns || {})[k] || k);
 
@@ -132,6 +145,7 @@ function renderChrome(r) {
     : t("sub.board", { path: `${esc(S.cfg.home)}/${esc(board.id)}/` });
   $("#sub").innerHTML = `<a class="crumb" href="#/">${I.left} ${t("crumb")}</a> · ${where}`;
   S.inbox = cards.reduce((s, c) => s + num(c.messages_open), 0);
+  document.title = `${S.inbox ? `(${S.inbox}) ` : ""}${board.title || board.id} · devboard`;
   const tabs = [["board", I.cols, t("tab.board")], ["history", I.hist, t("tab.history")], ["pending", I.warn, t("tab.pending")], ["messages", I.msg, t("tab.messages")]];
   $("#tabs").innerHTML = tabs.map(([v, icon, name]) =>
     `<a class="tab${v === r.view || (r.view === "card" && v === "board") ? " on" : ""}" href="${href(S.board, v)}">${icon} ${name}${v === "messages" && S.inbox ? ` <span class="n">${S.inbox}</span>` : ""}</a>`).join("");
@@ -151,7 +165,7 @@ function cardHtml(c, ro) {
   if (c.messages_open) chips += `<span class="msg" title="${t("chip.messages")}">${I.msg} ${num(c.messages_open)}</span>`;
   if (c.files_count) chips += `<span class="clip" title="${t("chip.files")}">${I.clip} ${num(c.files_count)}</span>`;
   if (c.claimed_by) chips += `<span class="agent" title="${t("chip.claimed", { agent: esc(c.claimed_by.agent), until: esc(hm(c.claimed_by.until)) })}">${I.bot} ${esc(c.claimed_by.agent)}</span>`;
-  return `<a class="card${ro ? " ro" : ""}" href="${href(S.board, "card", c.id)}" data-id="${esc(c.id)}" draggable="${ro ? "false" : "true"}">
+  return `<a class="card${ro ? " ro" : ""}${c.id === S.moved ? " moved" : ""}" href="${href(S.board, "card", c.id)}" data-id="${esc(c.id)}" draggable="${ro ? "false" : "true"}">
     <div class="chips">${chips}</div>
     <div class="ctitle">${esc(c.title)}</div>
     <div class="prog"><div class="track"><span style="width:${num(c.progress)}%"></span></div><span class="pct">${pct(c)}</span></div>
@@ -171,7 +185,7 @@ function renderBoard() {
   $("#main").innerHTML = `<div class="columns">${Object.entries(S.data.board.columns || {}).map(([key, name]) => {
     const cs = list.filter((c) => c.column === key);
     return `<section class="col k-${esc(key)}" data-col="${esc(key)}"><h2><i class="dot"></i>${esc(name)} <small>${cs.length}</small></h2>
-      <p class="desc">${ro ? "" : DESC(key)}</p>${cs.map((c) => cardHtml(c, ro)).join("")}</section>`;
+      <p class="desc">${ro ? "" : DESC(key)}</p>${cs.map((c) => cardHtml(c, ro)).join("")}${!cs.length && !ro ? `<div class="empty-col">${t("col.empty")}</div>` : ""}</section>`;
   }).join("")}</div>`;
   if (!ro) wireDrag();
 }
@@ -194,6 +208,9 @@ function wireDrag() {
       if (!c || c.column === col.dataset.col) return;
       const from = c.column;
       c.column = col.dataset.col; // optimistic (Doherty): move now, confirm with the server
+      S.moved = id;
+      clearTimeout(S.movedTimer);
+      S.movedTimer = setTimeout(() => { S.moved = null; }, 1600);
       renderBoard();
       try {
         await api(`${cardUrl(id)}/move`, { etag: c.etag, status: col.dataset.col });
@@ -240,7 +257,7 @@ const who = (by) => (by === "human" ? t("who.human") : by === "agent" ? t("who.a
 function timeline(evs, withCard) {
   if (!evs.length) return `<p class="empty">${t("tl.empty")}</p>`;
   return `<ol class="tl">${evs.map((ev) => `<li class="${ev.by === "human" ? "you" : ""}">
-    <time>${fmtDate(ev.ts)} ${esc(String(ev.ts || "").slice(11, 16))} · ${who(ev.by)}${withCard ? ` · <a href="${href(S.board, "card", ev.card)}">${label(ev.card)}</a>` : ""}</time>
+    <time title="${fmtDate(ev.ts)} ${esc(hm(ev.ts))}">${rel(ev.ts)} · ${who(ev.by)}${withCard ? ` · <a href="${href(S.board, "card", ev.card)}">${label(ev.card)}</a>` : ""}</time>
     <strong>${describe(ev)}</strong></li>`).join("")}</ol>`;
 }
 
@@ -391,7 +408,7 @@ function boardCard(b) {
     <a class="t" href="${href(b.id)}">${esc(b.title)}</a>${mini(b)}
     <div class="nums"><span>${t("home.cards")} <b>${num(b.cards)}</b></span><span>${t("home.done")} <b>${num(b.done)}</b></span>
       <span>${t("home.blocked")} <b>${num((b.counts || {}).blocked)}</b></span><span>${t("home.avg")} <b>${b.avg == null ? "—" : num(b.avg) + "%"}</b></span></div>
-    <div class="acts"><span class="when">${t("home.updated", { when: fmtWhen(b.updated) })}</span>
+    <div class="acts"><span class="when">${t("home.updated", { when: when(b.updated) })}</span>
       <span><button class="ghost" data-archive="${b.archived ? "0" : "1"}">${t(b.archived ? "home.unarchive" : "home.archive")}</button>
       <a class="btn open-board" href="${href(b.id)}">${t("home.open")}</a></span></div></div>`;
 }
@@ -399,6 +416,8 @@ function boardCard(b) {
 function renderHome() {
   const active = S.boards.filter((b) => !b.archived), arch = S.boards.filter((b) => b.archived);
   $("#title").textContent = t("home.title");
+  const waiting = active.reduce((s, b) => s + num(b.messages_open), 0);
+  document.title = `${waiting ? `(${waiting}) ` : ""}${t("home.title")} · devboard`;
   $("#sub").innerHTML = t("home.sub", { path: `${esc(S.cfg.home)}/`, active: active.length, archived: arch.length });
   $("#tabs").innerHTML = "";
   $("#toolbar").hidden = true;
@@ -455,6 +474,25 @@ async function refresh() {
   else if (r.view === "messages") await renderInbox();
   else renderBoard();
 }
+
+function typing(el) {
+  return el && (el.tagName === "TEXTAREA" || el.tagName === "INPUT" || el.isContentEditable);
+}
+
+document.addEventListener("keydown", (e) => {
+  const r = route(), el = document.activeElement;
+  if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && el && el.id === "ask") { e.preventDefault(); $("#send").click(); return; }
+  if (e.key === "/" && !typing(el)) {
+    const box = $("#search:not([hidden])") && !$("#toolbar").hidden ? $("#search") : $("#home-search");
+    if (box) { e.preventDefault(); box.focus(); }
+    return;
+  }
+  if (e.key === "Escape") {
+    if (typing(el)) { el.blur(); return; }
+    if (S.board && r.view !== "board") location.hash = href(S.board);
+    else if (S.board) location.hash = "#/";
+  }
+});
 
 function busy() {
   const ask = $("#ask");

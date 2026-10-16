@@ -79,3 +79,18 @@ def test_unknown_language_falls_back_to_english(monkeypatch):
 
 def test_safe_name_fallback_is_english():
     assert store.safe_name("...") == "file"
+
+
+def test_languages_are_discovered_from_files(monkeypatch):
+    cfg = server.config()
+    assert {"en", "pt-BR", "es"} <= set(cfg["langs"])
+    monkeypatch.setenv("DEVBOARD_LANG", "es-MX")
+    assert server.config()["lang"] == "es"
+
+
+def test_every_language_has_every_key():
+    import json as _json
+    d = Path(server.WEB) / "i18n"
+    en = set(_json.loads((d / "en.json").read_text(encoding="utf-8")))
+    for f in d.glob("*.json"):
+        assert set(_json.loads(f.read_text(encoding="utf-8"))) == en, f.name

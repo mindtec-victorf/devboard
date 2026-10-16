@@ -5,12 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title data-i18n="page.title">Development board</title>
   <link rel="preload" href="fonts/nunito-sans.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="app.css">
 </head>
 <body>
   <header class="top">
     <div>
-      <p class="eyebrow" data-i18n="eyebrow">Development · local only</p>
+      <p class="eyebrow"><img class="mark" src="favicon.svg" alt=""><span data-i18n="eyebrow">Development · local only</span></p>
       <h1 id="title" data-i18n="page.title">Development board</h1>
       <p class="sub" id="sub"></p>
     </div>
@@ -22,6 +23,7 @@
     <div class="stats" id="stats"></div>
   </div>
   <main id="main"></main>
+  <p class="shortcuts" data-i18n="shortcuts">Shortcuts: / search · Esc back · Ctrl+Enter send</p>
   <div id="toast" role="status" aria-live="polite"></div>
   <script src="app.js"></script>
 </body>

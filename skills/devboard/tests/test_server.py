@@ -217,3 +217,14 @@ def test_claim_is_visible_in_api(srv, card):
     j = req(srv, "GET", "/api/b/p")[1]
     assert j["cards"][0]["claimed_by"]["agent"] == "codex-1"
     assert req(srv, "GET", "/api/b/p/claims")[1][0]["agent"] == "codex-1"
+
+
+def test_favicon_and_unknown_language_file(srv):
+    c = http.client.HTTPConnection("127.0.0.1", srv, timeout=5)
+    c.request("GET", "/favicon.svg")
+    r = c.getresponse()
+    assert r.status == 200 and r.getheader("Content-Type").startswith("image/svg+xml") and b"<svg" in r.read()
+    c.close()
+    assert req(srv, "GET", "/i18n/es.json")[0] == 200
+    assert req(srv, "GET", "/i18n/xx.json")[0] == 404
+    assert req(srv, "GET", "/i18n/..%2Fapp.js")[0] == 404

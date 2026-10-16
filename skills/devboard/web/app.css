@@ -143,3 +143,14 @@ main { padding: 0 34px 40px; }
 .mini span { display: block; height: 100%; }
 .agent { display: inline-flex; align-items: center; gap: 3px; background: #eae8fb; color: #4b3fb0; border-radius: 999px; padding: 1px 8px; font-size: 11px; font-weight: 800; }
 .claim { margin: 14px 0 0; background: #f3f1fe; border: 1px solid #d9d4fa; color: #3c3489; border-radius: 12px; padding: 10px 14px; font-weight: 700; }
+.mark { width: 18px; height: 16px; vertical-align: -3px; margin-right: 6px; }
+.empty-col { border: 2px dashed #d6e2de; border-radius: 10px; padding: 18px 10px; text-align: center; color: var(--soft); font-size: 12.5px; margin-bottom: 12px; }
+.col.over .empty-col { border-color: var(--teal); color: var(--teal); background: #fff; }
+.card { transition: box-shadow .15s, transform .15s; }
+.card:active { cursor: grabbing; }
+.card.moved { animation: moved 1.2s ease-out; }
+@keyframes moved { 0% { transform: scale(1.03); box-shadow: 0 0 0 4px #9ed6c4; } 100% { transform: none; box-shadow: 0 1px 2px rgb(16 40 35 / 6%); } }
+a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, .card:focus-visible {
+  outline: 3px solid #7fcdb4; outline-offset: 2px; }
+.shortcuts { color: var(--soft); font-size: 11.5px; text-align: center; padding: 0 0 24px; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }

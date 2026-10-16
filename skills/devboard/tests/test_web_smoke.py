@@ -169,3 +169,39 @@ def test_claim_is_shown_on_board_and_card(base_url, browser_page):
     page.goto(base_url + "#/p/card/21")
     page.get_by_text("codex-1 is working on this").wait_for()
     page.get_by_text("codex-1 claimed it").wait_for()
+
+
+def test_tab_title_shows_board_and_waiting_messages(base_url, browser_page):
+    store.Board("p").message("21", "please check")
+    page = browser_page
+    page.goto(base_url + "#/p")
+    page.locator('.card[data-id="21"]').wait_for()
+    page.wait_for_function("document.title.startsWith('(1) Project')")
+
+
+def test_keyboard_shortcuts(base_url, browser_page):
+    page = browser_page
+    page.goto(base_url + "#/p")
+    page.locator('.card[data-id="21"]').wait_for()
+    page.keyboard.press("/")
+    assert page.evaluate("document.activeElement.id") == "search"
+    page.goto(base_url + "#/p/card/21")
+    page.fill("#ask", "sent with the keyboard")
+    page.keyboard.press("Control+Enter")
+    page.get_by_text("Waiting for the agent").wait_for()
+    page.locator(".panel h1").click()
+    page.keyboard.press("Escape")
+    page.wait_for_function("location.hash === '#/p'")
+
+
+def test_drag_feedback_and_relative_time(base_url, browser_page):
+    page = browser_page
+    page.goto(base_url + "#/p")
+    page.locator('.col[data-col="done"] .empty-col').wait_for()
+    page.drag_and_drop('.card[data-id="21"]', '.col[data-col="done"]')
+    page.locator('.col[data-col="done"] .card[data-id="21"].moved').wait_for()
+    page.goto(base_url + "#/p/history")
+    t = page.locator(".tl time").first
+    t.wait_for()
+    assert "ago" in t.inner_text() or "just now" in t.inner_text()
+    assert t.get_attribute("title")

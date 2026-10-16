@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0
+- Logo and favicon (original pixel mascot holding a kanban card), light and dark.
+- Page polish: tab title with the board and waiting messages, keyboard shortcuts (`/`, `Esc`, `Ctrl/Cmd+Enter`),
+  drop hint in empty columns, a flash on the moved card, relative times, focus rings, reduced-motion support.
+- Languages are discovered from `web/i18n/*.json`; Spanish added.
+
 ## 0.3.0
 - Agents claim cards: `claim` (renew by claiming again, expires after `--ttl`, `--force` logged), `release --note`
   for handoffs, `who`; shown on the page, in `summary` and in the session-start line. Writes on a card held by

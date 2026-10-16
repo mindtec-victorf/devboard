@@ -1,4 +1,9 @@
-<h1 align="center">devboard</h1>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/logo-dark.svg">
+    <img src="docs/brand/logo.svg" alt="devboard" width="420">
+  </picture>
+</p>
 
 <p align="center"><strong>A local Kanban board that your AI agents keep up to date.</strong></p>
 <p align="center">They track the work. You see it at a glance, drag cards and leave them messages.</p>
@@ -182,7 +187,7 @@ Every command has `--help`. Exit codes: `0` ok, `1` problems found, `2` usage er
 |---|---|---|
 | `DEVBOARD_HOME` | `~/.devboard` | Where boards are stored |
 | `DEVBOARD_AGENT` | — | The agent's name, used for claims and to sign changes |
-| `DEVBOARD_LANG` | `en` | Language of the page |
+| `DEVBOARD_LANG` | `en` | Language of the page. Each file in `skills/devboard/web/i18n/` is a language; to add one, copy `en.json` and translate it |
 | `DEVBOARD_TEMPLATE` | `stages` | Template used by `init` |
 | `DEVBOARD_ROLLOUTS` | `~/.devboard/rollouts` | Folders scanned for rollout ledgers |
 
@@ -241,7 +246,8 @@ Put it in `~/.devboard/rollouts/<name>/STATUS.json`, or run `devboard link-rollo
 ```bash
 git clone https://github.com/mindtec-victorf/devboard && cd devboard/skills/devboard
 python3 -m pytest -q                      # browser tests run if Playwright is installed
-python3 ../../docs/make-screenshots.py    # rebuild the images in this README
+python3 ../../docs/make-screenshots.py    # rebuild the screenshots and the GIF
+python3 ../../docs/make-logo.py           # rebuild the logo and the favicon
 ```
 
 Tests run on Linux, macOS and Windows on every push.
@@ -251,7 +257,8 @@ Tests run on Linux, macOS and Windows on every push.
 The idea and the design come from **Rogério Dornelas**, who built a development-only page that shows
 a JSON file his AI agent keeps updated. devboard turns it into a plugin anyone can install.
 
-Font: Nunito Sans, © The Nunito Sans Project Authors, SIL Open Font License 1.1.
+The mascot is an original pixel character made for devboard. Font: Nunito Sans, © The Nunito Sans
+Project Authors, SIL Open Font License 1.1.
 
 ## License
 
