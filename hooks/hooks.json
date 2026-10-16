@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|clear|compact|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/skills/devboard/scripts/devboard.py\" hook",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

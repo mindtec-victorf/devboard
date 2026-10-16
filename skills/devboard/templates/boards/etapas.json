@@ -1,0 +1,10 @@
+{
+  "columns": {
+    "todo": "A fazer",
+    "blocked": "Bloqueada / aguardando",
+    "doing": "Em andamento",
+    "final": "Ajustes finais",
+    "done": "Concluída"
+  },
+  "card_md": "etapa.md"
+}

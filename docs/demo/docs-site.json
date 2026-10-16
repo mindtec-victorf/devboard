@@ -1,0 +1,5 @@
+{"board": "docs-site", "ops": [
+ {"op": "add", "card": "1", "title": "New landing page", "fields": {"progress": 100}},
+ {"op": "add", "card": "2", "title": "API reference", "fields": {"started": true, "progress": 60, "next": "document the webhooks"}},
+ {"op": "add", "card": "3", "title": "Search", "fields": {"blocked": "waiting for the search index quota"}}
+]}

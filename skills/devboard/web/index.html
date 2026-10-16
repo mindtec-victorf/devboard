@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title data-i18n="page.title">Development board</title>
+  <link rel="preload" href="fonts/nunito-sans.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <header class="top">
+    <div>
+      <p class="eyebrow" data-i18n="eyebrow">Development · local only</p>
+      <h1 id="title" data-i18n="page.title">Development board</h1>
+      <p class="sub" id="sub"></p>
+    </div>
+    <nav class="tabs" id="tabs"></nav>
+  </header>
+  <div class="toolbar" id="toolbar">
+    <label class="search"><span id="i-search"></span><input id="search" type="search" placeholder="Search by number, title or text…" data-i18n-placeholder="toolbar.search"></label>
+    <label class="prio"><input id="prio" type="checkbox" hidden><span id="i-target"></span> <span id="prio-label" data-i18n="toolbar.prio">Priority queue only</span></label>
+    <div class="stats" id="stats"></div>
+  </div>
+  <main id="main"></main>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>

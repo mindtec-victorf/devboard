@@ -1,0 +1,10 @@
+{
+  "columns": {
+    "todo": "To do",
+    "blocked": "Blocked / waiting",
+    "doing": "In progress",
+    "final": "Final touches",
+    "done": "Done"
+  },
+  "card_md": "stage.md"
+}

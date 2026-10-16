@@ -1,0 +1,12 @@
+{"board": "checkout", "ops": [
+ {"op": "add", "card": "1", "title": "Payments API", "fields": {"progress": 100, "estimate": "24h", "due": "2026-09-04"}},
+ {"op": "add", "card": "2", "title": "Cart redesign", "fields": {"progress": 95, "estimate": "20h", "due": "2026-10-07", "situation": "copy review left"}},
+ {"op": "add", "card": "3", "title": "Fraud checks", "fields": {"priority": 1, "tags": ["Critical"], "estimate": "~30h", "due": "2026-10-24", "next": "wire the risk score API into checkout"},
+  "md": "# Fraud checks\n\n## Goal\n\nScore every order before capture and hold the risky ones for review.\n\n## Checklist\n\n- [x] Risk score client\n- [x] Hold queue in the admin panel\n- [x] Alerts for the support team\n- [ ] Threshold tuning with the risk team\n- [ ] Load test at 2x Black Friday\n\n## Decisions\n\n- Orders above score 80 are held, never auto-cancelled.\n"},
+ {"op": "add", "card": "4", "title": "Tax rules per region", "fields": {"waiting": "legal review of the new rules", "estimate": "~16h"}},
+ {"op": "add", "card": "5", "title": "Mobile wallet", "fields": {"priority": 2, "estimate": "~40h", "due": "2026-11-15"}},
+ {"op": "add", "card": "6", "title": "Load testing", "fields": {"estimate": "12h"}},
+ {"op": "add", "card": "7", "title": "Release notes", "fields": {"started": true, "progress": 30}},
+ {"op": "note", "card": "3", "text": "Hold queue shipped to staging"},
+ {"op": "note", "card": "2", "text": "Design sign-off"}
+]}

@@ -1,0 +1,10 @@
+{
+  "name": "devboard",
+  "description": "One local board for all your development work: Kanban cards with checklist, history, attachments and messages, that your AI agent updates with one deterministic command and you drive from a localhost page. Resume any project cheaply and talk to your agents asynchronously.",
+  "version": "0.1.0",
+  "author": { "name": "Victor Ferreira" },
+  "homepage": "https://github.com/mindtec-victorf/devboard",
+  "repository": "https://github.com/mindtec-victorf/devboard",
+  "license": "MIT",
+  "keywords": ["kanban", "progress", "board", "agents", "async", "claude-code", "skill"]
+}

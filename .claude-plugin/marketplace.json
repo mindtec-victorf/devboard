@@ -1,0 +1,12 @@
+{
+  "name": "devboard",
+  "owner": { "name": "Victor Ferreira" },
+  "plugins": [
+    {
+      "name": "devboard",
+      "source": "./",
+      "description": "Local development board your AI agent updates and you drive from a page: cards, checklist, history, attachments, async messages.",
+      "version": "0.1.0"
+    }
+  ]
+}
