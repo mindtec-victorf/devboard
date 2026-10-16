@@ -63,6 +63,7 @@ contains it). Archived boards are skipped.
 | `archive <board>` · `unarchive <board>` | hide a finished board (data stays) |
 | `link-rollout <path/STATUS.json>` | show a rollout ledger from anywhere |
 | `serve [--port 8765]` | the page |
+| `hint` · `setup-agent <agent> [--project D]` | one line about this folder's board · instructions for Codex, Gemini, Cursor, Copilot, AGENTS.md |
 
 Exit codes: 0 ok · 1 findings · 2 usage error · 3 conflict.
 

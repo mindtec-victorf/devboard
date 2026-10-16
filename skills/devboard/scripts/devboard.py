@@ -14,7 +14,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from boardlib import apply as batch  # noqa: E402
-from boardlib import rollout, store  # noqa: E402
+from boardlib import agents, rollout, store  # noqa: E402
 from boardlib.derive import COLUMNS  # noqa: E402
 
 for _stream in (sys.stdout, sys.stderr):
@@ -305,10 +305,19 @@ def cmd_hook(a):
         return
 
 
+def cmd_setup_agent(a):
+    cli = Path(__file__).resolve()
+    if a.print:
+        print(agents.snippet(cli))
+        return
+    path = agents.setup(a.agent, Path.home(), a.project or os.getcwd(), cli)
+    print(f"devboard instructions written to {path}")
+
+
 def cmd_hint(a):
     """One line for the SessionStart hook; prints nothing (exit 0) when there is no board."""
     try:
-        bid = store.resolve(a.cwd)
+        bid = store.resolve(a.cwd or os.getcwd())
         if not bid:
             return
         cs = store.Board(bid).cards()
@@ -418,8 +427,12 @@ def build_parser():
     sp.add_argument("--port", type=int, default=8765)
     sp.add_argument("--open", action="store_true", help="open the browser")
     cmd("hook", cmd_hook, "SessionStart hook entry point (reads the hook JSON on stdin)")
-    sp = cmd("hint", cmd_hint, "one-line hint for a SessionStart hook")
-    sp.add_argument("--cwd", required=True)
+    sp = cmd("hint", cmd_hint, "one line about the board of this folder (prints nothing when there is none)")
+    sp.add_argument("--cwd", help="folder to check (default: the current one)")
+    sp = cmd("setup-agent", cmd_setup_agent, "write devboard instructions for another agent (idempotent)")
+    sp.add_argument("agent", choices=sorted(agents.TARGETS), help="codex/gemini: global file; cursor/copilot/agents: per project")
+    sp.add_argument("--project", help="project folder for cursor, copilot and agents (default: current folder)")
+    sp.add_argument("--print", action="store_true", help="print the block instead of writing it")
     return p
 
 

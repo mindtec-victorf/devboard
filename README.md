@@ -2,7 +2,8 @@
 
 **One local board for all your development work — that your AI agent keeps up to date, and you drive from a page.**
 
-devboard is a [Claude Code](https://claude.com/claude-code) plugin. Each project gets a Kanban board:
+devboard is a [Claude Code](https://claude.com/claude-code) plugin that also works with Codex, Gemini CLI,
+Cursor, GitHub Copilot and any agent that reads `AGENTS.md`. Each project gets a Kanban board:
 cards with a checklist, an append-only history, attachments and messages. Your agent updates it with
 one deterministic command per change. You open `localhost`, drag cards, tick boxes, drop in a PRD or a
 video, and leave a message. The agent reads your messages at the start of its next round and answers
@@ -51,17 +52,35 @@ cleanly. devboard replaces that file with structured, cheap state:
 
 ## Install
 
-In Claude Code:
+**Claude Code** — the plugin brings the skill and a SessionStart hook:
 
 ```
 /plugin marketplace add mindtec-victorf/devboard
 /plugin install devboard@devboard
 ```
 
-Restart the session. The skill is `devboard:devboard`; the SessionStart hook is registered by the
-plugin. The CLI runs from the plugin folder: `skills/devboard/scripts/devboard.py`.
+**Any other agent** — one line puts the `devboard` CLI on your `PATH` and wires up the agents it finds:
 
-Requirements: Python 3.10+ as `python3` on the `PATH` (the hook calls `python3`).
+```bash
+curl -fsSL https://raw.githubusercontent.com/mindtec-victorf/devboard/main/install.sh | sh
+```
+
+Requirements: Python 3.10+ as `python3` (and `git` for the installer).
+
+### Use with other agents
+
+| Agent | What the installer does | Per project |
+|---|---|---|
+| Claude Code | — use the plugin above | nothing |
+| OpenAI Codex | links the skill into `~/.codex/skills/` and writes a block in `~/.codex/AGENTS.md` | nothing |
+| GitHub Copilot | links the skill into `~/.copilot/skills/` | `devboard setup-agent copilot` → `.github/copilot-instructions.md` |
+| Gemini CLI | writes a block in `~/.gemini/GEMINI.md` | nothing |
+| Cursor | — | `devboard setup-agent cursor` → `.cursor/rules/devboard.mdc` |
+| Anything else | — | `devboard setup-agent agents` → `AGENTS.md`, or `--print` to paste it anywhere |
+
+The block is short and idempotent (between `<!-- devboard:start/end -->` markers, so re-running replaces
+it). Agents without a SessionStart hook are told to run `devboard hint` and `devboard inbox` when a
+session starts — the same thing the Claude Code hook does for you.
 
 ## Quickstart
 
@@ -101,6 +120,7 @@ The skill teaches a short cost law:
 | `archive` · `unarchive` | hide a finished board (data stays) |
 | `link-rollout <STATUS.json>` | show a rollout ledger from anywhere, read-only |
 | `serve [--port 8765]` | the page |
+| `hint` · `setup-agent <codex/gemini/cursor/copilot/agents>` | session-start line · instructions for other agents |
 
 Every command has `--help`. Exit codes: 0 ok · 1 findings (`validate`/`audit`) · 2 usage error · 3 conflict.
 
