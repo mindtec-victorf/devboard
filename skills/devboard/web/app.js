@@ -81,7 +81,15 @@ function rel(ts) {
 }
 const when = (ts) => `<time title="${fmtDate(ts)} ${esc(hm(ts))}">${rel(ts)}</time>`;
 const pct = (c) => (c.progress == null ? "—" : `${num(c.progress)}%`);
-const colName = (k) => esc((S.data.board.columns || {})[k] || k);
+// Boards made from a built-in template keep its default column names in board.json; show those in the
+// page language. A name someone customized is shown as written.
+const DEFAULT_COLS = { stages: { todo: "To do", blocked: "Blocked / waiting", doing: "In progress", final: "Final touches", done: "Done" },
+  etapas: { todo: "A fazer", blocked: "Bloqueada / aguardando", doing: "Em andamento", final: "Ajustes finais", done: "Concluída" } };
+const colLabel = (k, stored) => {
+  const def = Object.values(DEFAULT_COLS).some((d) => d[k] === stored);
+  return def && T[`col.${k}`] ? t(`col.${k}`) : stored || k;
+};
+const colName = (k) => esc(colLabel(k, (S.data.board.columns || {})[k]));
 
 // --- markdown subset. Line rule and checklist numbering MUST match derive.checklist in Python. ---
 const CHECK_RE = /^([ \t]*[-*][ \t]+)\[( |x|X)\]([ \t][^\n]*)?$/;
@@ -184,7 +192,7 @@ function renderBoard() {
   if ($("#prio").checked) list = list.filter((c) => c.priority).sort((a, b) => a.priority - b.priority);
   $("#main").innerHTML = `<div class="columns">${Object.entries(S.data.board.columns || {}).map(([key, name]) => {
     const cs = list.filter((c) => c.column === key);
-    return `<section class="col k-${esc(key)}" data-col="${esc(key)}"><h2><i class="dot"></i>${esc(name)} <small>${cs.length}</small></h2>
+    return `<section class="col k-${esc(key)}" data-col="${esc(key)}"><h2><i class="dot"></i>${esc(colLabel(key, name))} <small>${cs.length}</small></h2>
       <p class="desc">${ro ? "" : DESC(key)}</p>${cs.map((c) => cardHtml(c, ro)).join("")}${!cs.length && !ro ? `<div class="empty-col">${t("col.empty")}</div>` : ""}</section>`;
   }).join("")}</div>`;
   if (!ro) wireDrag();
@@ -221,7 +229,7 @@ function wireDrag() {
         refresh().catch(() => {});
         return;
       }
-      toast(t("toast.moved", { col: (S.data.board.columns || {})[col.dataset.col] || col.dataset.col }));
+      toast(t("toast.moved", { col: colLabel(col.dataset.col, (S.data.board.columns || {})[col.dataset.col]) }));
       refresh().catch(() => {});
     });
   }

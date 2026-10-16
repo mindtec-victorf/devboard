@@ -45,6 +45,7 @@ devboard replaces that with a board:
 - 🧾 **Full history.** Every change records who made it and when; `devboard audit` checks nothing was edited by hand
 - 🏠 **All your projects on one screen,** grouped by repository, with archiving
 - 🔒 **Local and private.** Plain files in `~/.devboard`, a page on `127.0.0.1`, no account, no cloud
+- 🌍 **In your language:** English, Spanish, French, German, Italian, Japanese, Simplified Chinese
 - 🪶 **No dependencies.** Python 3.10+ and a browser
 
 ## Getting started
@@ -187,7 +188,7 @@ Every command has `--help`. Exit codes: `0` ok, `1` problems found, `2` usage er
 |---|---|---|
 | `DEVBOARD_HOME` | `~/.devboard` | Where boards are stored |
 | `DEVBOARD_AGENT` | — | The agent's name, used for claims and to sign changes |
-| `DEVBOARD_LANG` | `en` | Language of the page. Each file in `skills/devboard/web/i18n/` is a language; to add one, copy `en.json` and translate it |
+| `DEVBOARD_LANG` | `en` | Language of the page: `en`, `es`, `fr`, `de`, `it`, `ja`, `zh-CN`. Each file in `skills/devboard/web/i18n/` is a language; to add one, copy `en.json` and translate it |
 | `DEVBOARD_TEMPLATE` | `stages` | Template used by `init` |
 | `DEVBOARD_ROLLOUTS` | `~/.devboard/rollouts` | Folders scanned for rollout ledgers |
 

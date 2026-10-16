@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.1
+- French, German, Italian, Japanese and Simplified Chinese; default column names follow the page language.
+- A test checks that every translation keeps the placeholders and the markup of the English text.
+- Font stack falls back to the system's Japanese and Chinese fonts.
+
 ## 0.4.0
 - Logo and favicon (original pixel mascot holding a kanban card), light and dark.
 - Page polish: tab title with the board and waiting messages, keyboard shortcuts (`/`, `Esc`, `Ctrl/Cmd+Enter`),

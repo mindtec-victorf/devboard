@@ -6,7 +6,7 @@
   --red-ink: #c62828; --red-soft: #fdeceb;
 }
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 "Nunito Sans", system-ui, sans-serif; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 "Nunito Sans", system-ui, -apple-system, "Segoe UI", "Hiragino Sans", "Yu Gothic UI", "Meiryo", "PingFang SC", "Microsoft YaHei", "Noto Sans JP", "Noto Sans SC", "Noto Sans CJK JP", "Noto Sans CJK SC", sans-serif; }
 code { font: 12px ui-monospace, Consolas, monospace; background: #e9efed; padding: 1px 5px; border-radius: 4px; }
 svg.i { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vertical-align: -2px; }
 .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding: 30px 34px 0; flex-wrap: wrap; }

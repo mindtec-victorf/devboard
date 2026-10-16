@@ -94,3 +94,16 @@ def test_every_language_has_every_key():
     en = set(_json.loads((d / "en.json").read_text(encoding="utf-8")))
     for f in d.glob("*.json"):
         assert set(_json.loads(f.read_text(encoding="utf-8"))) == en, f.name
+
+
+def test_translations_keep_placeholders_and_markup():
+    import json as _json
+    import re as _re
+    d = Path(server.WEB) / "i18n"
+    en = _json.loads((d / "en.json").read_text(encoding="utf-8"))
+    marks = lambda s: (sorted(_re.findall(r"\{\w+\}", s)), sorted(_re.findall(r"</?\w+", s)))  # noqa: E731
+    for f in d.glob("*.json"):
+        other = _json.loads(f.read_text(encoding="utf-8"))
+        for k, v in en.items():
+            assert marks(other[k]) == marks(v), f"{f.name}: {k}"
+            assert other[k].strip(), f"{f.name}: {k} is empty"

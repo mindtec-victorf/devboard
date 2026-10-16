@@ -205,3 +205,11 @@ def test_drag_feedback_and_relative_time(base_url, browser_page):
     t.wait_for()
     assert "ago" in t.inner_text() or "just now" in t.inner_text()
     assert t.get_attribute("title")
+
+
+def test_default_column_names_follow_the_page_language(base_url, browser_page, monkeypatch):
+    monkeypatch.setenv("DEVBOARD_LANG", "es")
+    page = browser_page
+    page.goto(base_url + "#/p")
+    page.locator('.col[data-col="todo"] h2', has_text="Por hacer").wait_for()
+    page.locator('.col[data-col="doing"] h2', has_text="En curso").wait_for()
