@@ -154,3 +154,5 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
   outline: 3px solid #7fcdb4; outline-offset: 2px; }
 .shortcuts { color: var(--soft); font-size: 11.5px; text-align: center; padding: 0 0 24px; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+.i.brand { width: 13px; height: 13px; }
+.tl time .i { width: 12px; height: 12px; vertical-align: -2px; }

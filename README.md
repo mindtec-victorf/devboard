@@ -40,7 +40,7 @@ devboard replaces that with a board:
 - 🤖 **Works with Claude Code, Codex, Gemini CLI, Cursor, GitHub Copilot** and any agent that reads `AGENTS.md`
 - 🗂️ **Kanban in the browser.** Drag cards between columns, tick checklists, search, filter by priority
 - 💬 **Messages to your agents.** They read them first thing and reply on the card
-- 🙋 **Claims.** An agent marks the card it is working on; claims expire on their own
+- 🙋 **Claims.** An agent marks the card it is working on, with its tool's icon (Claude, Gemini, Copilot, Cursor…); claims expire on their own
 - 📎 **Attachments.** PRDs, screenshots, PDFs and videos, with previews
 - 🧾 **Full history.** Every change records who made it and when; `devboard audit` checks nothing was edited by hand
 - 🏠 **All your projects on one screen,** grouped by repository, with archiving
@@ -101,7 +101,8 @@ Then go to <http://127.0.0.1:8765>.
 
 The skill teaches every agent the same routine:
 
-1. **Pick a name** for the session: `export DEVBOARD_AGENT=codex-tests`.
+1. **Pick a name** for the session: `export DEVBOARD_AGENT=claude-main`. The first word picks the icon on the page
+   (`claude`, `gemini`, `copilot`, `cursor`, `codex`; anything else gets a generic one).
 2. **Read your messages first:** `devboard inbox`, then `devboard reply <card> <n> "what I did"`.
 3. **Look at the board:** `devboard summary` and `devboard who`.
 4. **Claim a free card:** `devboard claim <card> --note "what I'm about to do"`.
@@ -258,7 +259,8 @@ Tests run on Linux, macOS and Windows on every push.
 The idea and the design come from **Rogério Dornelas**, who built a development-only page that shows
 a JSON file his AI agent keeps updated. devboard turns it into a plugin anyone can install.
 
-The mascot is an original pixel character made for devboard. Font: Nunito Sans, © The Nunito Sans
+The mascot is an original pixel character made for devboard. Agent icons come from
+[Simple Icons](https://simpleicons.org) (CC0); the trademarks belong to their owners and only identify each tool. Font: Nunito Sans, © The Nunito Sans
 Project Authors, SIL Open Font License 1.1.
 
 ## License

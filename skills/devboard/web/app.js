@@ -66,6 +66,21 @@ const fmtDate = (d) => {
 };
 const fmtSize = (n) => (n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : n >= 1024 ? `${Math.round(n / 1024)} KB` : `${num(n)} B`);
 const label = (id) => (/^\d+$/.test(id) ? t("stage", { id: esc(id) }) : esc(id));
+// The icon next to an agent's name: its tool, from the first word of the name ("claude-main" -> Claude).
+function agentKind(name) {
+  const icons = typeof AGENT_ICONS === "undefined" ? {} : AGENT_ICONS;
+  const prefixes = typeof AGENT_PREFIXES === "undefined" ? {} : AGENT_PREFIXES;
+  const kind = prefixes[String(name || "").toLowerCase().split(/[-_.\s]/)[0]];
+  return kind && icons[kind] ? kind : "generic";
+}
+function agentIcon(name) {
+  const kind = agentKind(name);
+  const icon = kind === "generic" ? null : AGENT_ICONS[kind];
+  if (!icon || !icon.path) {
+    return I.bot.replace("<svg ", `<svg data-kind="${kind}" `).replace('aria-hidden="true">', `aria-hidden="true"><title>${esc(icon ? icon.title : "")}</title>`);
+  }
+  return `<svg class="i brand" data-kind="${kind}" viewBox="0 0 24 24" aria-hidden="true"><title>${esc(icon.title)}</title><path fill="#${esc(icon.hex)}" stroke="none" d="${esc(icon.path)}"/></svg>`;
+}
 const hm = (ts) => String(ts || "").slice(11, 16);
 // "5 min ago", "yesterday"...; the exact date stays in the title attribute
 function rel(ts) {
@@ -172,7 +187,7 @@ function cardHtml(c, ro) {
   for (const tag of c.tags || []) chips += `<span class="crit">${esc(tag)}</span>`;
   if (c.messages_open) chips += `<span class="msg" title="${t("chip.messages")}">${I.msg} ${num(c.messages_open)}</span>`;
   if (c.files_count) chips += `<span class="clip" title="${t("chip.files")}">${I.clip} ${num(c.files_count)}</span>`;
-  if (c.claimed_by) chips += `<span class="agent" title="${t("chip.claimed", { agent: esc(c.claimed_by.agent), until: esc(hm(c.claimed_by.until)) })}">${I.bot} ${esc(c.claimed_by.agent)}</span>`;
+  if (c.claimed_by) chips += `<span class="agent" title="${t("chip.claimed", { agent: esc(c.claimed_by.agent), until: esc(hm(c.claimed_by.until)) })}">${agentIcon(c.claimed_by.agent)} ${esc(c.claimed_by.agent)}</span>`;
   return `<a class="card${ro ? " ro" : ""}${c.id === S.moved ? " moved" : ""}" href="${href(S.board, "card", c.id)}" data-id="${esc(c.id)}" draggable="${ro ? "false" : "true"}">
     <div class="chips">${chips}</div>
     <div class="ctitle">${esc(c.title)}</div>
@@ -260,7 +275,7 @@ function describe(ev) {
   if (ev.note) parts.unshift(esc(ev.note));
   return parts.join(" · ") || esc(ev.kind);
 }
-const who = (by) => (by === "human" ? t("who.human") : by === "agent" ? t("who.agent") : esc(by));
+const who = (by) => (by === "human" ? t("who.human") : by === "agent" ? t("who.agent") : `${agentIcon(by)} ${esc(by)}`);
 
 function timeline(evs, withCard) {
   if (!evs.length) return `<p class="empty">${t("tl.empty")}</p>`;
@@ -299,7 +314,7 @@ async function renderCard(id) {
     <div class="kpis"><div class="kpi"><b>${t("kpi.progress")}</b><div>${progress}</div></div>
       <div class="kpi"><b>${t("kpi.estimate")}</b><div>${esc(c.estimate || "—")}${c.due ? ` · ${I.clock} ${fmtDate(c.due)}` : ""}</div></div>
       <div class="kpi"><b>${t("kpi.situation")}</b><div>${esc(c.situation || "—")}</div></div></div>
-    ${c.claimed_by ? `<div class="claim">${I.bot} ${t("card.claimed", { agent: esc(c.claimed_by.agent), until: esc(hm(c.claimed_by.until)) })}${c.claimed_by.note ? ` · ${esc(c.claimed_by.note)}` : ""}</div>` : ""}
+    ${c.claimed_by ? `<div class="claim">${agentIcon(c.claimed_by.agent)} ${t("card.claimed", { agent: esc(c.claimed_by.agent), until: esc(hm(c.claimed_by.until)) })}${c.claimed_by.note ? ` · ${esc(c.claimed_by.note)}` : ""}</div>` : ""}
     ${c.next ? `<div class="hl">${t("card.next", { text: esc(c.next) })}</div>` : ""}
     ${c.blocked ? `<div class="line bad">${I.minus} ${esc(c.blocked)}</div>` : ""}
     ${c.waiting ? `<div class="line">${I.wait} ${esc(c.waiting)}</div>` : ""}

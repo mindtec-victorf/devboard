@@ -213,3 +213,23 @@ def test_default_column_names_follow_the_page_language(base_url, browser_page, m
     page.goto(base_url + "#/p")
     page.locator('.col[data-col="todo"] h2', has_text="Por hacer").wait_for()
     page.locator('.col[data-col="doing"] h2', has_text="En curso").wait_for()
+
+
+def test_agent_icons_follow_the_agent_name(base_url, browser_page):
+    b = store.Board("p")
+    b.claim("21", "claude-main", note="refactor")
+    b.claim("20", "codex-tests")
+    page = browser_page
+    page.goto(base_url + "#/p")
+    page.locator('.card[data-id="21"] .agent svg[data-kind="claude"]').wait_for()
+    page.locator('.card[data-id="20"] .agent svg[data-kind="openai"]').wait_for()
+    page.goto(base_url + "#/p/card/21")
+    page.locator('.claim svg[data-kind="claude"]').wait_for()
+    page.locator('.tl svg[data-kind="claude"]').first.wait_for()
+
+
+def test_unknown_agent_gets_the_generic_icon(base_url, browser_page):
+    store.Board("p").claim("21", "bob")
+    page = browser_page
+    page.goto(base_url + "#/p")
+    page.locator('.card[data-id="21"] .agent svg[data-kind="generic"]').wait_for()

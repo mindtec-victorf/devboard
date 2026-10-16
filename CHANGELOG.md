@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.0
+- Agent icons on claims and in the history, picked from the first word of the agent's name (Claude, Gemini,
+  GitHub Copilot, Cursor; Codex and unknown names get a neutral icon). Built by `docs/make-agent-icons.py`
+  from Simple Icons (CC0) at a pinned version.
+
 ## 0.4.1
 - French, German, Italian, Japanese and Simplified Chinese; default column names follow the page language.
 - A test checks that every translation keeps the placeholders and the markup of the English text.

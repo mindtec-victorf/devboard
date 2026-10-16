@@ -22,7 +22,8 @@ Pick one stable name for the whole session, `<tool>-<role>`: `claude-main`, `cod
 export DEVBOARD_AGENT=claude-main
 ```
 
-Without it, claims refuse to run and your writes are signed `agent`, which tells nobody anything.
+Without it, claims refuse to run and your writes are signed `agent`, which tells nobody anything. The first
+word also picks the icon people see next to your claims (`claude`, `gemini`, `copilot`, `cursor`, `codex`).
 
 ## The round — do this every time you pick up work
 

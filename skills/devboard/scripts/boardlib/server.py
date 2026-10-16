@@ -22,6 +22,7 @@ STATIC = {
     "/app.css": ("app.css", "text/css; charset=utf-8"),
     "/fonts/nunito-sans.woff2": ("fonts/nunito-sans.woff2", "font/woff2"),
     "/favicon.svg": ("favicon.svg", "image/svg+xml"),
+    "/agent-icons.js": ("agent-icons.js", "text/javascript; charset=utf-8"),
 }
 LANG_RE = re.compile(r"^/i18n/([A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,4})?)\.json$")
 MAX_BODY = 256_000

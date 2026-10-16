@@ -39,13 +39,13 @@ def demo_gif(pg, url, b):
     pg.goto(url + "#/checkout/card/6"); pg.wait_for_selector("#ask"); snap(1200)
     pg.fill("#ask", "Run the load test again with the cache on, please"); snap(1400)
     pg.click("#send"); pg.wait_for_selector(".open"); snap(1600)
-    b.claim("6", "codex-tests", note="rerunning with the cache on")
+    b.claim("6", "claude-tests", note="rerunning with the cache on")
     with tempfile.TemporaryDirectory() as d:
         report = Path(d) / "load-test.csv"
         report.write_text("rps,p95_ms\n300,210\n600,340\n", encoding="utf-8")
-        b.attach("6", report, by="codex-tests")
-    b.note("6", "p95 210 ms at 300 rps with the cache on", by="codex-tests")
-    b.reply("6", 1, "Done: p95 dropped from 410 to 210 ms at 300 rps. Report attached.", by="codex-tests")
+        b.attach("6", report, by="claude-tests")
+    b.note("6", "p95 210 ms at 300 rps with the cache on", by="claude-tests")
+    b.reply("6", 1, "Done: p95 dropped from 410 to 210 ms at 300 rps. Report attached.", by="claude-tests")
     pg.reload(); pg.wait_for_selector(".answered"); snap(2600)
     pg.goto(url + "#/checkout"); pg.wait_for_selector('.card[data-id="6"] .agent'); snap(2600)
     w = 1100
