@@ -11,8 +11,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 def board_home(tmp_path, monkeypatch):
     home = tmp_path / "devboard"
     monkeypatch.setenv("DEVBOARD_HOME", str(home))
-    for var in ("DEVBOARD_LANG", "DEVBOARD_TEMPLATE", "DEVBOARD_ROLLOUTS"):
+    for var in ("DEVBOARD_LANG", "DEVBOARD_TEMPLATE", "DEVBOARD_ROLLOUTS", "DEVBOARD_NOTIFY_CMD", "DEVBOARD_AGENT"):
         monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("DEVBOARD_NOTIFY", "0")  # no desktop notices from the test run
     monkeypatch.delenv("BOARD_ACTOR", raising=False)
     return home
 

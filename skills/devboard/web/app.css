@@ -25,7 +25,7 @@ h1 { margin: 2px 0 2px; font-size: 21px; font-weight: 800; }
 .stats { margin-left: auto; color: var(--muted); display: flex; gap: 22px; }
 .stats b { color: var(--ink); }
 main { padding: 0 34px 40px; }
-.columns { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 22px; align-items: start; }
+.columns { display: grid; grid-template-columns: repeat(var(--n, 5), minmax(0, 1fr)); gap: 22px; align-items: start; }
 .col { background: var(--col); border-radius: 14px; padding: 14px 12px 4px; min-height: 160px; transition: background .15s; }
 .col.over { background: var(--teal-soft); outline: 2px dashed #9ed6c4; outline-offset: -4px; }
 .col h2 { margin: 0 4px; font-size: 15px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
@@ -156,3 +156,19 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 .i.brand { width: 13px; height: 13px; }
 .tl time .i { width: 12px; height: 12px; vertical-align: -2px; }
+/* 0.6.0: columns scroll on their own, manual order, who a card is for, requests to the person */
+.col { display: flex; flex-direction: column; max-height: calc(100vh - 210px); padding-bottom: 8px; }
+.col .cards { flex: 1; min-height: 70px; overflow-y: auto; overscroll-behavior: contain; margin: 0 -6px; padding: 2px 6px 4px; scrollbar-width: thin; }
+.drop-mark { height: 4px; margin: -8px 2px 8px; border-radius: 2px; background: var(--teal); box-shadow: 0 0 0 3px var(--teal-soft); pointer-events: none; }
+.for, .req { display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; padding: 1px 8px; font-size: 11px; font-weight: 800; background: #eef1fb; color: #3949ab; }
+.for.you, .req { background: #fff4e0; color: #9a5b00; }
+.for svg.i, .req svg.i { width: 13px; height: 13px; }
+.assign { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; font-weight: 800; font-size: 13px; }
+.assign select { flex: 1; font: inherit; font-weight: 600; padding: 7px 10px; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--ink); }
+.reqs { border-color: #f3d39b; background: #fffaf0; }
+.request + .request { margin-top: 14px; padding-top: 14px; border-top: 1px dashed #f3d39b; }
+.request .q { font-size: 13px; margin-bottom: 8px; }
+.request .err { color: var(--red-ink); font-size: 12px; min-height: 0; }
+.bcard.mine { border-color: #f3d39b; background: #fffdf7; }
+.bcard .desc { margin: 4px 0 8px; color: var(--muted); font-size: 12.5px; }
+@media (max-width: 1100px) { .col { max-height: 70vh; } }

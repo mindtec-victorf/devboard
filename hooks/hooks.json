@@ -11,6 +11,17 @@
           }
         ]
       }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "py=$(command -v python3 || command -v python || command -v py); \"$py\" \"${CLAUDE_PLUGIN_ROOT}/skills/devboard/scripts/devboard.py\" hook",
+            "timeout": 5
+          }
+        ]
+      }
     ]
   }
 }

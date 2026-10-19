@@ -28,6 +28,7 @@ const I = {
   repeat: SVG('<path d="M4 12V9a3 3 0 0 1 3-3h13l-3-3M20 12v3a3 3 0 0 1-3 3H4l3 3"/>'),
   box: SVG('<rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8M10 12h4"/>'),
   bot: SVG('<rect x="5" y="8" width="14" height="11" rx="3"/><path d="M12 4v4M9 13h.01M15 13h.01M9.5 16h5"/>'),
+  user: SVG('<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>'),
   clip: SVG('<path d="m15 7-6.5 6.5a1.5 1.5 0 0 0 3 3L18 10a3 3 0 0 0-6-6l-6.5 6.5a4.5 4.5 0 0 0 9 9L21 13"/>'),
 };
 const DESC = (key) => (T[`desc.${key}`] ? t(`desc.${key}`) : "");
@@ -81,6 +82,22 @@ function agentIcon(name) {
   }
   return `<svg class="i brand" data-kind="${kind}" viewBox="0 0 24 24" aria-hidden="true"><title>${esc(icon.title)}</title><path fill="#${esc(icon.hex)}" stroke="none" d="${esc(icon.path)}"/></svg>`;
 }
+// Who a card is for: "user", "agent", "agent:<name>", "agent@<repo>" or "agent:<name>@<repo>".
+function assigneeParts(v) {
+  const s = String(v || "");
+  if (s === "user") return { kind: "user" };
+  const m = s.match(/^agent(?::([^@]+))?(?:@(.+))?$/);
+  return m ? { kind: "agent", name: m[1] || "", repo: m[2] || "" } : null;
+}
+function assigneeChip(v) {
+  const p = assigneeParts(v);
+  if (!p) return "";
+  if (p.kind === "user") return `<span class="for you" title="${t("chip.for_user")}">${I.user} ${t("chip.for_user")}</span>`;
+  const repo = p.repo ? p.repo.split(/[\\/]/).filter(Boolean).pop() : "";
+  const who = p.name ? esc(p.name) : t("who.agent");
+  return `<span class="for" title="${t("chip.for_agent", { agent: esc(v) })}">${p.name ? agentIcon(p.name) : I.bot} ${who}${repo ? ` · ${esc(repo)}` : ""}</span>`;
+}
+const boardTitle = (meta, kind) => (kind === "user" ? t("user.title") : meta.title || meta.id);
 const hm = (ts) => String(ts || "").slice(11, 16);
 // "5 min ago", "yesterday"...; the exact date stays in the title attribute
 function rel(ts) {
@@ -162,13 +179,15 @@ function renderMd(md, readonly) {
 // --- chrome ---
 function renderChrome(r) {
   const { board, kind, cards } = S.data;
-  $("#title").textContent = board.title || board.id;
+  $("#title").textContent = boardTitle(board, kind);
   const where = kind === "rollout"
     ? t("sub.rollout", { src: esc(board.source) })
+    : kind === "user" ? t("sub.user")
     : t("sub.board", { path: `${esc(S.cfg.home)}/${esc(board.id)}/` });
   $("#sub").innerHTML = `<a class="crumb" href="#/">${I.left} ${t("crumb")}</a> · ${where}`;
   S.inbox = cards.reduce((s, c) => s + num(c.messages_open), 0);
-  document.title = `${S.inbox ? `(${S.inbox}) ` : ""}${board.title || board.id} · devboard`;
+  const asked = cards.reduce((s, c) => s + num(c.requests_open), 0);
+  document.title = `${S.inbox + asked ? `(${S.inbox + asked}) ` : ""}${boardTitle(board, kind)} · devboard`;
   const tabs = [["board", I.cols, t("tab.board")], ["history", I.hist, t("tab.history")], ["pending", I.warn, t("tab.pending")], ["messages", I.msg, t("tab.messages")]];
   $("#tabs").innerHTML = tabs.map(([v, icon, name]) =>
     `<a class="tab${v === r.view || (r.view === "card" && v === "board") ? " on" : ""}" href="${href(S.board, v)}">${icon} ${name}${v === "messages" && S.inbox ? ` <span class="n">${S.inbox}</span>` : ""}</a>`).join("");
@@ -182,13 +201,18 @@ function renderChrome(r) {
 
 // --- board ---
 function cardHtml(c, ro) {
-  let chips = `<span class="eid">${label(c.id)}</span>`;
+  // On the automatic "user" board a card is a window on the original: it opens there, where the person acts.
+  const src = c.source_board ? { board: c.source_board, id: c.source_id } : null;
+  let chips = src ? `<span class="eid">${esc(c.source_title || src.board)} · ${label(src.id)}</span>` : `<span class="eid">${label(c.id)}</span>`;
   if (c.priority) chips += `<span class="pp">${I.target} ${t("chip.priority", { n: num(c.priority) })}</span>`;
+  if (c.assignee && !(src && c.assignee === "user")) chips += assigneeChip(c.assignee);
   for (const tag of c.tags || []) chips += `<span class="crit">${esc(tag)}</span>`;
+  if (c.requests_open) chips += `<span class="req" title="${t("chip.requests")}">${I.user} ${num(c.requests_open)}</span>`;
   if (c.messages_open) chips += `<span class="msg" title="${t("chip.messages")}">${I.msg} ${num(c.messages_open)}</span>`;
   if (c.files_count) chips += `<span class="clip" title="${t("chip.files")}">${I.clip} ${num(c.files_count)}</span>`;
   if (c.claimed_by) chips += `<span class="agent" title="${t("chip.claimed", { agent: esc(c.claimed_by.agent), until: esc(hm(c.claimed_by.until)) })}">${agentIcon(c.claimed_by.agent)} ${esc(c.claimed_by.agent)}</span>`;
-  return `<a class="card${ro ? " ro" : ""}${c.id === S.moved ? " moved" : ""}" href="${href(S.board, "card", c.id)}" data-id="${esc(c.id)}" draggable="${ro ? "false" : "true"}">
+  const link = src ? href(src.board, "card", src.id) : href(S.board, "card", c.id);
+  return `<a class="card${ro && !src ? " ro" : ""}${c.id === S.moved ? " moved" : ""}" href="${link}" data-id="${esc(c.id)}" draggable="${ro ? "false" : "true"}">
     <div class="chips">${chips}</div>
     <div class="ctitle">${esc(c.title)}</div>
     <div class="prog"><div class="track"><span style="width:${num(c.progress)}%"></span></div><span class="pct">${pct(c)}</span></div>
@@ -199,52 +223,95 @@ function cardHtml(c, ro) {
   </a>`;
 }
 
+// Place of a card in its column: its rank when someone ordered it, else after the ordered ones, by id.
+// Unranked cards get 1e6 + their position so a drop between two of them never has to rewrite the others.
+function effRank(c) {
+  if (c.rank != null && Number.isFinite(Number(c.rank))) return Number(c.rank);
+  return 1e6 + S.data.cards.findIndex((x) => x.id === c.id);
+}
+const byRank = (a, b) => effRank(a) - effRank(b);
+
+function columnCards(list, key) {
+  const cs = list.filter((c) => c.column === key);
+  return S.data.kind === "user" || $("#prio").checked ? cs : cs.sort(byRank);
+}
+
 function renderBoard() {
   const ro = S.data.readonly;
   const q = $("#search").value.trim().toLowerCase();
   let list = S.data.cards.filter((c) => !q ||
-    [c.id, c.title, c.situation, c.next, c.blocked, c.waiting, ...(c.tags || [])].join(" ").toLowerCase().includes(q));
+    [c.id, c.title, c.situation, c.next, c.blocked, c.waiting, c.assignee, c.source_title, ...(c.tags || [])].join(" ").toLowerCase().includes(q));
   if ($("#prio").checked) list = list.filter((c) => c.priority).sort((a, b) => a.priority - b.priority);
-  $("#main").innerHTML = `<div class="columns">${Object.entries(S.data.board.columns || {}).map(([key, name]) => {
-    const cs = list.filter((c) => c.column === key);
+  const ncols = Object.keys(S.data.board.columns || {}).length || 5;
+  $("#main").innerHTML = `<div class="columns" style="--n:${ncols}">${Object.entries(S.data.board.columns || {}).map(([key, name]) => {
+    const cs = columnCards(list, key);
     return `<section class="col k-${esc(key)}" data-col="${esc(key)}"><h2><i class="dot"></i>${esc(colLabel(key, name))} <small>${cs.length}</small></h2>
-      <p class="desc">${ro ? "" : DESC(key)}</p>${cs.map((c) => cardHtml(c, ro)).join("")}${!cs.length && !ro ? `<div class="empty-col">${t("col.empty")}</div>` : ""}</section>`;
+      <p class="desc">${ro ? "" : DESC(key)}</p><div class="cards">${cs.map((c) => cardHtml(c, ro)).join("")}${!cs.length && !ro ? `<div class="empty-col">${t("col.empty")}</div>` : ""}</div></section>`;
   }).join("")}</div>`;
   if (!ro) wireDrag();
 }
 
+// Where a drop lands in a column: before the first card whose middle is below the pointer.
+function dropIndex(col, y, dragId) {
+  const els = [...col.querySelectorAll(".card")].filter((el) => el.dataset.id !== dragId);
+  const i = els.findIndex((el) => { const r = el.getBoundingClientRect(); return y < r.top + r.height / 2; });
+  return { els, i: i < 0 ? els.length : i };
+}
+
 function wireDrag() {
   let dragId = null;
+  const mark = document.createElement("div");
+  mark.className = "drop-mark";
+  const clearMark = () => mark.remove();
   for (const el of document.querySelectorAll(".card[draggable=true]")) {
     el.addEventListener("dragstart", (e) => { dragId = el.dataset.id; el.classList.add("dragging"); e.dataTransfer.setData("text/plain", dragId); });
-    el.addEventListener("dragend", () => { el.classList.remove("dragging"); dragId = null; });
+    el.addEventListener("dragend", () => { el.classList.remove("dragging"); dragId = null; clearMark(); });
   }
   for (const col of document.querySelectorAll(".col")) {
-    col.addEventListener("dragover", (e) => { e.preventDefault(); col.classList.add("over"); });
-    col.addEventListener("dragleave", () => col.classList.remove("over"));
+    col.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      col.classList.add("over");
+      if (!dragId) return;
+      const { els, i } = dropIndex(col, e.clientY, dragId);
+      const box = col.querySelector(".cards");
+      if (i < els.length) box.insertBefore(mark, els[i]); else box.appendChild(mark);
+    });
+    col.addEventListener("dragleave", (e) => { if (!col.contains(e.relatedTarget)) { col.classList.remove("over"); clearMark(); } });
     col.addEventListener("drop", async (e) => {
       e.preventDefault();
       col.classList.remove("over");
+      clearMark();
       const id = dragId; // only a card dragged on this page moves; files and text dropped here do not
       dragId = null;
       const c = id && S.data.cards.find((x) => x.id === id);
-      if (!c || c.column === col.dataset.col) return;
-      const from = c.column;
-      c.column = col.dataset.col; // optimistic (Doherty): move now, confirm with the server
+      if (!c) return;
+      const key = col.dataset.col;
+      const { i } = dropIndex(col, e.clientY, id);
+      const others = columnCards(S.data.cards, key).filter((x) => x.id !== id);
+      const prev = others[i - 1], next = others[i];
+      const sameSpot = c.column === key && columnCards(S.data.cards, key).indexOf(c) === i;
+      if (sameSpot) return;
+      // Reordering is skipped while the priority filter sorts the columns: there the drop only changes the column.
+      const rank = $("#prio").checked ? undefined
+        : prev && next ? (effRank(prev) + effRank(next)) / 2 : prev ? effRank(prev) + 1 : next ? effRank(next) - 1 : 0;
+      if (c.column === key && rank === undefined) return;
+      const from = { column: c.column, rank: c.rank };
+      c.column = key; // optimistic (Doherty): move now, confirm with the server
+      if (rank !== undefined) c.rank = rank;
       S.moved = id;
       clearTimeout(S.movedTimer);
       S.movedTimer = setTimeout(() => { S.moved = null; }, 1600);
       renderBoard();
       try {
-        await api(`${cardUrl(id)}/move`, { etag: c.etag, status: col.dataset.col });
+        await api(`${cardUrl(id)}/move`, rank === undefined ? { etag: c.etag, status: key } : { etag: c.etag, status: key, rank });
       } catch (err) {
-        c.column = from;
+        Object.assign(c, from);
         renderBoard();
         toast(err.status === 409 ? t("toast.move_conflict") : t("toast.move_fail", { err: err.message }));
         refresh().catch(() => {});
         return;
       }
-      toast(t("toast.moved", { col: colLabel(col.dataset.col, (S.data.board.columns || {})[col.dataset.col]) }));
+      toast(from.column === key ? t("toast.reordered") : t("toast.moved", { col: colLabel(key, (S.data.board.columns || {})[key]) }));
       refresh().catch(() => {});
     });
   }
@@ -254,8 +321,8 @@ function wireDrag() {
 function describe(ev) {
   const ch = ev.changes || {};
   if (ev.kind === "create") return t("ev.create");
-  if (ev.kind === "message") return t("ev.message", { text: esc(ev.note) });
-  if (ev.kind === "reply") return t("ev.reply", { text: esc(ev.note) });
+  if (ev.kind === "message") return t(ev.to === "user" ? "ev.request" : "ev.message", { text: esc(ev.note) });
+  if (ev.kind === "reply") return t(ev.by === "human" ? "ev.answered" : "ev.reply", { text: esc(ev.note) });
   if (ev.kind === "attach") return t("ev.attach", { name: esc(ev.name) });
   if (ev.kind === "detach") return t("ev.detach", { name: esc(ev.name) });
   if (ev.kind === "claim") return t(ev.forced_from ? "ev.claim_forced" : "ev.claim", { agent: esc(ev.agent), from: esc(ev.forced_from), until: esc(hm(ev.until)) }) + (ev.note ? ` · ${esc(ev.note)}` : "");
@@ -270,7 +337,10 @@ function describe(ev) {
   if (ch.blocked) parts.push(ch.blocked[1] ? t("ev.blocked", { text: esc(ch.blocked[1]) }) : t("ev.unblocked"));
   if (ch.waiting) parts.push(ch.waiting[1] ? t("ev.waiting", { text: esc(ch.waiting[1]) }) : t("ev.unwaiting"));
   if (ch.next && ch.next[1]) parts.push(t("ev.next", { text: esc(ch.next[1]) }));
-  const other = Object.keys(ch).filter((k) => !["status", "progress", "blocked", "waiting", "next"].includes(k));
+  if (ch.assignee) parts.push(!ch.assignee[1] ? t("ev.unassigned") : ch.assignee[1] === "user" ? t("ev.assigned_user")
+    : t("ev.assigned", { who: esc(ch.assignee[1]) }));
+  if (ch.rank) parts.push(t("ev.reordered"));
+  const other = Object.keys(ch).filter((k) => !["status", "progress", "blocked", "waiting", "next", "assignee", "rank"].includes(k));
   if (other.length) parts.push(t("ev.updated", { fields: other.map(esc).join(", ") }));
   if (ev.note) parts.unshift(esc(ev.note));
   return parts.join(" · ") || esc(ev.kind);
@@ -304,9 +374,22 @@ async function renderCard(id) {
   const ro = S.data.readonly;
   let chips = `<span class="eid">${label(c.id)}</span><span class="status"><i class="dot ${esc(c.column)}"></i> ${colName(c.column)}</span>`;
   if (c.priority) chips += `<span class="pp">${I.target} ${t("chip.priority", { n: num(c.priority) })}</span>`;
+  if (c.assignee) chips += assigneeChip(c.assignee);
   for (const tag of c.tags || []) chips += `<span class="crit">${esc(tag)}</span>`;
   const progress = c.checklist ? t("card.items", { pct: pct(c), done: num(c.checklist[1]), total: num(c.checklist[0]) }) : pct(c);
-  const open = c.messages.filter((m) => m.open), done = c.messages.filter((m) => !m.open).slice(-3).reverse();
+  const toAgent = c.messages.filter((m) => m.to !== "user"), toUser = c.messages.filter((m) => m.to === "user");
+  const open = toAgent.filter((m) => m.open), done = toAgent.filter((m) => !m.open).slice(-3).reverse();
+  const asked = toUser.filter((m) => m.open), answered = toUser.filter((m) => !m.open).slice(-3).reverse();
+  const options = [["", t("assign.none")], ["user", t("assign.user")], ["agent", t("assign.agent")]];
+  if (c.assignee && !options.some(([v]) => v === c.assignee)) options.push([c.assignee, c.assignee]);
+  const assign = `<label class="assign">${t("card.for")} <select id="assignee">${options.map(([v, name]) =>
+    `<option value="${esc(v)}"${(c.assignee || "") === v ? " selected" : ""}>${esc(name)}</option>`).join("")}</select></label>`;
+  const requests = asked.length || answered.length ? `<h3>${I.user} ${t("req.title")} <small>${asked.length}</small></h3><div class="ask reqs">
+      ${asked.map((m) => `<div class="request" data-n="${num(m.n)}"><div class="q">${who(m.by)} · ${when(m.ts)}<br>“${esc(m.text)}”</div>
+        ${ro ? "" : `<textarea placeholder="${t("req.placeholder")}"></textarea><div class="err"></div>
+        <div class="row"><span class="hint">${t("req.hint")}</span><button class="btn" data-answer="${num(m.n)}">${t("req.send")}</button></div>`}</div>`).join("")}
+      ${answered.map((m) => `<div class="answered"><b>${t("req.answered")}</b> ${esc(m.reply.text)}<br><span>${t("ask.about", { text: esc(m.text) })}</span></div>`).join("")}
+    </div>` : "";
   $("#main").innerHTML = `<a class="back" href="${href(S.board)}">${I.left} ${t("card.back")}</a>
   <div class="detail"><article class="panel" id="cardpanel">
     <div class="chips">${chips}</div>
@@ -325,6 +408,8 @@ async function renderCard(id) {
     </section>
   </article>
   <aside class="panel side">
+    ${ro ? "" : assign}
+    ${requests}
     ${ro ? "" : `<h3>${t("ask.title")}</h3><div class="ask">
       <textarea id="ask" placeholder="${t("ask.placeholder")}"></textarea>
       <div class="err" id="err"></div>
@@ -340,6 +425,25 @@ async function renderCard(id) {
 function wireCard(c) {
   const ask = $("#ask"), err = $("#err");
   ask.oninput = () => { err.textContent = ""; };
+  $("#assignee").onchange = async (e) => {
+    try {
+      await api(cardUrl(c.id), { etag: c.etag, changes: { assignee: e.target.value || null } });
+      toast(t("toast.assigned"));
+    } catch (er) { toast(er.status === 409 ? t("toast.check_conflict") : t("toast.error", { err: er.message })); }
+    await refresh();
+  };
+  for (const btn of document.querySelectorAll("[data-answer]")) {
+    btn.onclick = async () => {
+      const box = btn.closest(".request"), area = box.querySelector("textarea"), msg = box.querySelector(".err");
+      const text = area.value.trim();
+      if (!text) { msg.textContent = t("req.empty"); area.focus(); return; }
+      try {
+        await api(`${cardUrl(c.id)}/reply`, { n: Number(btn.dataset.answer), text });
+        await refresh();
+        toast(t("toast.answered"));
+      } catch (e) { msg.textContent = t("ask.fail", { err: e.message }); }
+    };
+  }
   $("#send").onclick = async () => {
     const text = ask.value.trim();
     if (!text) { err.textContent = t("ask.empty"); ask.focus(); return; }
@@ -426,38 +530,42 @@ function mini(b) {
 }
 
 function boardCard(b) {
-  const chips = `<span class="eid">${esc(b.id)}</span>${b.kind === "rollout" ? `<span class="tag-ro">${t("home.readonly")}</span>` : ""}${b.messages_open ? `<span class="msg">${I.msg} ${num(b.messages_open)}</span>` : ""}${b.error ? `<span class="crit">${t("home.error")}</span>` : ""}`;
-  return `<div class="bcard${b.archived ? " arch" : ""}" data-board="${esc(b.id)}"><div class="chips">${chips}</div>
-    <a class="t" href="${href(b.id)}">${esc(b.title)}</a>${mini(b)}
+  const mine = b.kind === "user";
+  const chips = `<span class="eid">${mine ? `${I.user} ${t("home.auto")}` : esc(b.id)}</span>${b.kind === "rollout" ? `<span class="tag-ro">${t("home.readonly")}</span>` : ""}${b.requests_open ? `<span class="req" title="${t("chip.requests")}">${I.user} ${num(b.requests_open)}</span>` : ""}${b.messages_open ? `<span class="msg">${I.msg} ${num(b.messages_open)}</span>` : ""}${b.error ? `<span class="crit">${t("home.error")}</span>` : ""}`;
+  return `<div class="bcard${b.archived ? " arch" : ""}${mine ? " mine" : ""}" data-board="${esc(b.id)}"><div class="chips">${chips}</div>
+    <a class="t" href="${href(b.id)}">${esc(boardTitle(b, b.kind))}</a>${mine ? `<p class="desc">${t("user.desc")}</p>` : ""}${mini(b)}
     <div class="nums"><span>${t("home.cards")} <b>${num(b.cards)}</b></span><span>${t("home.done")} <b>${num(b.done)}</b></span>
       <span>${t("home.blocked")} <b>${num((b.counts || {}).blocked)}</b></span><span>${t("home.avg")} <b>${b.avg == null ? "—" : num(b.avg) + "%"}</b></span></div>
     <div class="acts"><span class="when">${t("home.updated", { when: when(b.updated) })}</span>
-      <span><button class="ghost" data-archive="${b.archived ? "0" : "1"}">${t(b.archived ? "home.unarchive" : "home.archive")}</button>
+      <span>${mine ? "" : `<button class="ghost" data-archive="${b.archived ? "0" : "1"}">${t(b.archived ? "home.unarchive" : "home.archive")}</button>`}
       <a class="btn open-board" href="${href(b.id)}">${t("home.open")}</a></span></div></div>`;
 }
 
 function renderHome() {
   const active = S.boards.filter((b) => !b.archived), arch = S.boards.filter((b) => b.archived);
+  const real = active.filter((b) => b.kind !== "user").length;
   $("#title").textContent = t("home.title");
-  const waiting = active.reduce((s, b) => s + num(b.messages_open), 0);
+  const waiting = active.reduce((s, b) => s + num(b.messages_open), 0) + num((active.find((b) => b.kind === "user") || {}).requests_open);
   document.title = `${waiting ? `(${waiting}) ` : ""}${t("home.title")} · devboard`;
-  $("#sub").innerHTML = t("home.sub", { path: `${esc(S.cfg.home)}/`, active: active.length, archived: arch.length });
+  $("#sub").innerHTML = t("home.sub", { path: `${esc(S.cfg.home)}/`, active: real, archived: arch.length });
   $("#tabs").innerHTML = "";
   $("#toolbar").hidden = true;
   const q = (($("#home-search") || {}).value || "").trim().toLowerCase();
   const hit = (b) => !q || [b.id, b.title, b.group_name, b.group].join(" ").toLowerCase().includes(q);
   const groups = new Map();
   for (const b of active.filter(hit)) {
-    const key = b.kind === "rollout" ? "~rollouts" : b.group || "~none";
+    const key = b.kind === "user" ? "~user" : b.kind === "rollout" ? "~rollouts" : b.group || "~none";
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(b);
   }
   const latest = (bs) => Math.max(...bs.map((b) => Date.parse(b.updated) || 0));
-  const head = (key, bs) => key === "~rollouts" ? `${I.repeat} ${t("home.rollouts")}`
+  const head = (key, bs) => key === "~user" ? `${I.user} ${t("home.for_you")}` : key === "~rollouts" ? `${I.repeat} ${t("home.rollouts")}`
     : key === "~none" ? `${I.folder} ${t("home.no_repo")}` : `${I.folder} ${esc(bs[0].group_name)} <code>${esc(bs[0].group_label || key)}</code>`;
   const section = (title, bs) => `<section class="group"><h2>${title}</h2><div class="boards">${bs
     .sort((a, b) => (Date.parse(b.updated) || 0) - (Date.parse(a.updated) || 0)).map(boardCard).join("")}</div></section>`;
-  const body = [...groups.entries()].sort((a, b) => latest(b[1]) - latest(a[1])).map(([k, bs]) => section(head(k, bs), bs)).join("")
+  // What waits for the person comes first; then the boards by last activity.
+  const body = [...groups.entries()].sort((a, b) => (b[0] === "~user") - (a[0] === "~user") || latest(b[1]) - latest(a[1]))
+    .map(([k, bs]) => section(head(k, bs), bs)).join("")
     + (S.showArchived && arch.filter(hit).length ? section(`${I.box} ${t("home.archived")}`, arch.filter(hit)) : "");
   const typed = $("#home-search") ? $("#home-search").value : "";
   $("#main").innerHTML = `<div class="home-tools"><label class="search">${I.search}<input id="home-search" placeholder="${t("home.search")}"></label>
@@ -518,8 +626,8 @@ document.addEventListener("keydown", (e) => {
 });
 
 function busy() {
-  const ask = $("#ask");
-  return !!ask && (ask === document.activeElement || ask.value.trim() !== "");
+  return [...document.querySelectorAll("#ask, .request textarea")]
+    .some((el) => el === document.activeElement || el.value.trim() !== "");
 }
 
 async function poll() {

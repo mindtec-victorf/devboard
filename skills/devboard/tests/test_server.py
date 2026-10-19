@@ -228,3 +228,23 @@ def test_favicon_and_unknown_language_file(srv):
     assert req(srv, "GET", "/i18n/es.json")[0] == 200
     assert req(srv, "GET", "/i18n/xx.json")[0] == 404
     assert req(srv, "GET", "/i18n/..%2Fapp.js")[0] == 404
+
+
+def test_requests_reply_rank_and_user_board(srv, card):
+    b = store.Board("p")
+    m = b.ask("1", "Which domain?", by="codex")
+    code, rs = req(srv, "GET", "/api/b/p/requests")
+    assert code == 200 and rs[0]["text"] == "Which domain?"
+    assert req(srv, "POST", "/api/b/p/cards/1/reply", {"n": "1", "text": "x"}, H)[0] == 400
+    code, j = req(srv, "POST", "/api/b/p/cards/1/reply", {"n": m["n"], "text": "app.example.com"}, H)
+    assert code == 200 and j["open"] is False and b.card("1")["assignee"] == "agent:codex"
+    c = b.card("1")
+    code, j = req(srv, "POST", "/api/b/p/cards/1/move", {"etag": c["etag"], "status": c["column"], "rank": -2}, H)
+    assert code == 200 and j["rank"] == -2 and j.get("status") is None
+    b.set("1", {"assignee": "user"})
+    rows = req(srv, "GET", "/api/boards")[1]
+    assert rows[0]["id"] == "user" and rows[0]["kind"] == "user"
+    code, ub = req(srv, "GET", "/api/b/user")
+    assert code == 200 and ub["readonly"] is True and [x["id"] for x in ub["cards"]] == ["p:1"]
+    assert req(srv, "GET", "/api/b/user/cards/p:1")[1]["source_board"] == "p"
+    assert req(srv, "POST", "/api/b/user/cards/p:1/message", {"text": "x"}, H)[0] == 405

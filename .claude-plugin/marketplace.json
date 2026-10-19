@@ -6,7 +6,7 @@
       "name": "devboard",
       "source": "./",
       "description": "Local development board your AI agent updates and you drive from a page: cards, checklist, history, attachments, async messages.",
-      "version": "0.5.0"
+      "version": "0.6.0"
     }
   ]
 }

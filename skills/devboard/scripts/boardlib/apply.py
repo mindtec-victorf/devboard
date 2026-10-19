@@ -3,6 +3,7 @@
 File: {"board": "<id>", "ops": [{"op": ..., "card": "<id>", ...}, ...]}
   add   -> title, fields?, md?        set   -> changes?, note?
   note  -> text                        check -> item (1-based), done? (default true)
+  ask   -> text (a request to the user; the card is for the user until they answer)
 Every event carries src="apply:<sha1(file)[:8]>", so the batch is traceable in history.
 The same file on an empty board always builds the same board.
 """
@@ -39,8 +40,8 @@ def _plan_one(board, op, known):
         if data.get("progress") is not None and derive.checklist(known[cid]):
             raise store.BoardError("progress comes from the checklist; use check")
         return {"op": "add", "card": cid, "title": data.pop("title"), "fields": data, "md": md}
-    if kind not in ("set", "note", "check"):
-        raise store.BoardError(f"unknown op {kind!r} (add, set, note, check)")
+    if kind not in ("set", "note", "check", "ask"):
+        raise store.BoardError(f"unknown op {kind!r} (add, set, note, check, ask)")
     if cid not in known:
         raise store.BoardError(f"card {cid!r} not found")
     if kind == "set":
@@ -51,11 +52,11 @@ def _plan_one(board, op, known):
         if not changes and not note:
             raise store.BoardError("set needs changes or note")
         return {"op": "set", "card": cid, "changes": changes, "note": note}
-    if kind == "note":
+    if kind in ("note", "ask"):
         text = op.get("text")
         if not isinstance(text, str) or not text.strip():
-            raise store.BoardError("note needs text")
-        return {"op": "note", "card": cid, "text": text.strip()}
+            raise store.BoardError(f"{kind} needs text")
+        return {"op": kind, "card": cid, "text": text.strip()}
     n, done = op.get("item"), op.get("done", True)
     if isinstance(n, bool) or not isinstance(n, int) or not isinstance(done, bool):
         raise store.BoardError("check needs an integer item and a true/false done")
@@ -89,6 +90,8 @@ def run(board, ops, src, by="agent"):
             board.set(cid, op["changes"], note=op["note"], by=by, src=src)
         elif op["op"] == "note":
             board.note(cid, op["text"], by=by, src=src)
+        elif op["op"] == "ask":
+            board.ask(cid, op["text"], by=by, src=src)
         else:
             board.check(cid, op["item"], op["done"], by=by, src=src)
     return len(ops)

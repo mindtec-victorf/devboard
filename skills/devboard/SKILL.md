@@ -45,8 +45,27 @@ word also picks the icon people see next to your claims (`claude`, `gemini`, `co
    - state: `devboard set <card> --next "run the import in staging" --situation "code reviewed"`
 6. **Blocked?** Say why and on whom, concretely: `devboard set <card> --wait "DBA: index on Orders"`
    (or `--block "..."` for an internal blocker). Then release with a note so nobody waits on you.
+   **Blocked on the person** (a decision, a credential, a panel only they can open, a manual test, money)?
+   Ask on the card instead: `devboard ask <card> "Which domain for the passkey?"`. The card becomes
+   **for the user**, lands on their **For you** board and pops a desktop notice. Their answer hands the card
+   back to you, and you hear it on your next prompt. Never put a secret in the question or expect one in the answer.
 7. **Hand off when you stop.** `devboard release <card> --note "done: X; next: Y; watch out for Z"`.
    The next agent reads that note in `who`/`show` and starts where you stopped.
+
+## Who a card is for
+
+`--for` (alias `--para`) on `add`/`set` says whose move it is; `--unassign` clears it.
+
+| Value | Meaning |
+|---|---|
+| `user` | the person. Use it for work only they can do; prefer `ask` when you need an answer back |
+| `agent` | any agent working in the board's folders |
+| `agent:<name>` | one agent, by its `DEVBOARD_AGENT` name (`agent:codex-tests`) |
+| `agent@<repo>` · `agent:<name>@<repo>` | an agent working in that folder |
+
+A card for another agent is not yours: leave it, or `note` on it. A card for `agent` or for you is free to
+claim. In Claude Code the hook tells you, on your next prompt, about cards newly assigned to agents here,
+new messages and the person's answers; `devboard requests` lists what still waits for the person.
 
 ## Working with other agents
 
@@ -69,6 +88,8 @@ word also picks the icon people see next to your claims (`claude`, `gemini`, `co
 - **Long text** (goal, context, decisions) lives in `cards/<id>.md`; editing it with your file tools is
   fine. Tick checklist boxes with `check` so the event is logged.
 - **Don't paste, attach.** PRDs, screenshots, PDFs and videos go on the card with `attach`.
+- **The order inside a column** is the person's: they drag cards up and down (`rank`). Leave it alone unless
+  asked; `move <card> <column> --rank N` sets it (lower goes first).
 - **The column:** a person's drag (or `set --status`) pins it; `--status auto` unpins it. Unpinned,
   it is derived: blocked/waiting → blocked · 100% → done · 90–99% → final · started or >0% → doing ·
   else todo. With a checklist, progress = ticked/total and `--progress` is refused. A new block from
@@ -104,11 +125,12 @@ devboard release 6 --note "baseline in the card; next: cache on, same script (sc
 | Command | Use |
 |---|---|
 | `init <id> --title T --repo <folder>` | new board (`--template stages`) |
-| `add <card> --title T [--priority N --tag T --estimate T --due D --next T --md-file F]` | new card |
-| `set <card> [--progress N --start --block T/--unblock --wait T/--unwait --next T --situation T --status S] [--note T]` | change fields |
-| `note` · `check <card> <n> [--undo]` · `move <card> <column>` | milestone · tick item n · pin the column |
+| `add <card> --title T [--priority N --tag T --estimate T --due D --next T --for WHO --md-file F]` | new card |
+| `set <card> [--progress N --start --block T/--unblock --wait T/--unwait --for WHO/--unassign --next T --situation T --status S] [--note T]` | change fields |
+| `note` · `check <card> <n> [--undo]` · `move <card> <column> [--rank N]` | milestone · tick item n · pin the column (and place) |
 | `claim <card> [--as NAME --ttl 2h --note T --force]` · `release <card> [--note T]` · `who` | agent claims |
 | `inbox` · `reply <card> <n> "text"` | messages from people · answer and close one |
+| `ask <card> "text"` · `requests [--all]` | ask the person (card becomes `--for user` until they answer) · what waits for them |
 | `attach <card> <file> [--link]` · `files <card>` · `detach <card> <name>` | attachments |
 | `summary` · `show <card>` · `history` · `pending` · `boards [--all]` | read (`--json` for scripts) |
 | `apply <ops.json> [--dry-run]` · `validate` · `audit` | batch · health · history vs files |
@@ -125,7 +147,8 @@ Batch file for `apply`:
   {"op": "add", "card": "3", "title": "Fraud checks", "fields": {"priority": 1, "next": "wire the score API"}},
   {"op": "set", "card": "3", "changes": {"started": true}, "note": "phase 1 merged"},
   {"op": "check", "card": "3", "item": 2},
-  {"op": "note", "card": "3", "text": "threshold agreed with the risk team"}
+  {"op": "note", "card": "3", "text": "threshold agreed with the risk team"},
+  {"op": "ask", "card": "4", "text": "OK to spend up to US$ 4 on the acceptance run?"}
 ]}
 ```
 
