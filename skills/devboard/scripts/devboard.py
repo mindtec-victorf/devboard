@@ -9,6 +9,7 @@ Run `devboard.py <command> --help` for the flags of each command.
 import argparse
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -32,11 +33,13 @@ def line(c):
     pct = "—" if c.get("progress") is None else f"{c['progress']}%"
     prio = f"P{c['priority']}" if c.get("priority") else "-"
     s = f"{c['id']:>4} {c['column']:<7} {pct:>4} {prio:<3} {c['title']}"
-    for key in ("blocked", "waiting", "next"):
+    for key in ("assignee", "blocked", "waiting", "next"):
         if c.get(key):
-            s += f" | {key}: {c[key]}"
+            s += f" | {'for' if key == 'assignee' else key}: {c[key]}"
     if c.get("messages_open"):
         s += f" | inbox: {c['messages_open']}"
+    if c.get("requests_open"):
+        s += f" | asked the user: {c['requests_open']}"
     if c.get("files_count"):
         s += f" | files: {c['files_count']}"
     if c.get("claimed_by"):
@@ -83,6 +86,10 @@ def changes_from(a, current_tags=()):
         ch["waiting"] = a.wait
     if a.unwait:
         ch["waiting"] = None
+    if a.assignee is not None:
+        ch["assignee"] = a.assignee
+    if a.unassign:
+        ch["assignee"] = None
     if a.priority is not None:
         ch["priority"] = a.priority
     if a.no_priority:
@@ -281,7 +288,7 @@ def cmd_who(a):
 def cmd_move(a):
     b = pick(a)
     warn_claim(b, a.card, a.by)
-    print(line(b.move(a.card, a.status, by=a.by)))
+    print(line(b.move(a.card, a.status, by=a.by, rank=a.rank)))
 
 
 def cmd_inbox(a):
@@ -292,6 +299,23 @@ def cmd_inbox(a):
         print(f"{m['card']}#{m['n']} {m['ts'][:16].replace('T', ' ')} {m['by']}: {m['text']}  ({m['title']})")
     print(f"{len(msgs)} message(s) waiting; answer with devboard.py reply <card> <n> \"...\"" if msgs
           else "nothing waiting for the agent")
+
+
+def cmd_ask(a):
+    b = pick(a)
+    m = b.ask(a.card, a.text, by=a.by)
+    print(f"{a.card}#{m['n']} asked the user; the card is assigned to user until they answer "
+          f"(devboard.py requests shows what is open)")
+
+
+def cmd_requests(a):
+    b = store.open_board(store.USER_BOARD) if a.all else pick(a)
+    msgs = b.requests()
+    if a.json:
+        return out_json(msgs)
+    for m in msgs:
+        print(f"{m['card']}#{m['n']} {m['ts'][:16].replace('T', ' ')} {m['by']}: {m['text']}  ({m['title']})")
+    print(f"{len(msgs)} request(s) waiting for the user" if msgs else "nothing waiting for the user")
 
 
 def cmd_reply(a):
@@ -332,28 +356,84 @@ def cmd_serve(a):
     server.serve(a.port, a.open)
 
 
-def hint_line(bid, cs):
+def hint_line(bid, cs, cwd=None):
     doing = sum(c["column"] in ("doing", "final") for c in cs)
     blocked = sum(c["column"] == "blocked" for c in cs)
     waiting = sum(c.get("messages_open", 0) for c in cs)
     claimed = sum(1 for c in cs if c.get("claimed_by"))
+    agent = os.environ.get("DEVBOARD_AGENT")
+    mine = sum(1 for c in cs if c["column"] != "done" and store.assignee_for(c.get("assignee"), cwd, agent))
+    for_user = sum(1 for c in cs if c["column"] != "done" and c.get("assignee") == "user")
     inbox = f" · {waiting} messages for the agent (devboard.py inbox; answer them before moving on)" if waiting else ""
+    inbox += f" · {mine} assigned to agents here" if mine else ""
+    inbox += f" · {for_user} waiting for the user (devboard.py requests)" if for_user else ""
     inbox += f" · {claimed} claimed by agents (devboard who)" if claimed else ""
     return (f"Board {bid}: {len(cs)} cards ({doing} in progress, {blocked} blocked){inbox} — "
             f"python3 {Path(__file__).resolve()} summary")
 
 
+SESSION_RE = re.compile(r"[^A-Za-z0-9_-]")
+
+
+def _news(b, cwd):
+    """{key: line} of what an agent working in cwd should hear about: messages from people, cards assigned
+    to agents here, and the person's answers to agents' requests. Keys are stable, so each is told once."""
+    agent = os.environ.get("DEVBOARD_AGENT")
+    out = {}
+    for c in b.cards():
+        if c["column"] != "done" and store.assignee_for(c.get("assignee"), cwd, agent):
+            out[f"a:{c['id']}:{c['assignee']}"] = f"card {c['id']} is assigned to {c['assignee']}: {c['title']}"
+        for m in b.messages(c["id"]):
+            if m["to"] == "agent" and m["open"]:
+                out[f"m:{c['id']}:{m['n']}"] = f"{c['id']}#{m['n']} {m['by']} asks the agent: {m['text']}"
+            elif m["to"] == "user" and not m["open"]:
+                out[f"r:{c['id']}:{m['n']}"] = (f"{c['id']}#{m['n']} the user answered {m['by']}'s request "
+                                                f"(\"{m['text']}\"): {m['reply']['text']}")
+    return out
+
+
+def _seen_file(session):
+    name = SESSION_RE.sub("", str(session or ""))[:80]
+    return store.home() / ".seen" / f"{name}.json" if name else None
+
+
+def _load_seen(path):
+    try:
+        return set(json.loads(path.read_text(encoding="utf-8")))
+    except (OSError, ValueError, TypeError):
+        return set()
+
+
 def cmd_hook(a):
-    """SessionStart hook: reads the hook JSON on stdin; prints additionalContext only inside a board's repo."""
+    """Claude Code hook (SessionStart and UserPromptSubmit): reads the hook JSON on stdin and prints
+    additionalContext only inside a board's repo. SessionStart gives the one-line summary; each prompt
+    after that adds only what is new since the agent last heard (messages, assignments, answers)."""
     try:
         payload = json.loads(sys.stdin.read() or "{}")
-        bid = store.resolve(payload.get("cwd") or os.getcwd())
+        event = payload.get("hook_event_name") or "SessionStart"
+        cwd = payload.get("cwd") or os.getcwd()
+        bid = store.resolve(cwd)
         if not bid:
             return
-        line = hint_line(bid, store.Board(bid).cards())
-        print(json.dumps({"hookSpecificOutput": {"hookEventName": "SessionStart",
-                                                 "additionalContext": f"<devboard>\n{line}\n</devboard>"}}))
-    except Exception:  # noqa: BLE001 — a hook must never break session start
+        b = store.Board(bid)
+        seen_path = _seen_file(payload.get("session_id"))
+        news = _news(b, cwd)
+        if event == "UserPromptSubmit":
+            if seen_path is None:
+                return
+            seen = _load_seen(seen_path)
+            fresh = [line for key, line in news.items() if key not in seen]
+            store.atomic_write(seen_path, json.dumps(sorted(seen | set(news))))
+            if not fresh:
+                return
+            text = "New on board " + bid + " since your last turn:\n- " + "\n- ".join(fresh)
+        else:
+            if seen_path is not None:
+                store.atomic_write(seen_path, json.dumps(sorted(news)))
+            text = hint_line(bid, b.cards(), cwd)
+        print(json.dumps({"hookSpecificOutput": {"hookEventName": event,
+                                                 "additionalContext": f"<devboard>\n{text}\n</devboard>"}}))
+    except Exception:  # noqa: BLE001 — a hook must never break a session or a prompt
         return
 
 
@@ -376,7 +456,7 @@ def cmd_hint(a):
         doing = sum(c["column"] in ("doing", "final") for c in cs)
         blocked = sum(c["column"] == "blocked" for c in cs)
         waiting = sum(c.get("messages_open", 0) for c in cs)
-        print(hint_line(bid, cs))
+        print(hint_line(bid, cs, a.cwd or os.getcwd()))
     except Exception:  # noqa: BLE001 — a hint must never break session start
         return
 
@@ -407,6 +487,10 @@ def build_parser():
         g = sp.add_mutually_exclusive_group()
         g.add_argument("--wait", metavar="TEXT", help="waiting on a third party")
         g.add_argument("--unwait", action="store_true")
+        g = sp.add_mutually_exclusive_group()
+        g.add_argument("--for", "--para", dest="assignee", metavar="WHO",
+                       help="who the card is for: user, agent, agent:<name>, agent@<repo>, agent:<name>@<repo>")
+        g.add_argument("--unassign", action="store_true", help="the card is for nobody in particular")
         g = sp.add_mutually_exclusive_group()
         g.add_argument("--priority", type=int)
         g.add_argument("--no-priority", action="store_true")
@@ -471,7 +555,13 @@ def build_parser():
     sp = cmd("move", cmd_move, "move a card to a column (leaving blocked clears the reason)")
     sp.add_argument("card")
     sp.add_argument("status", choices=COLUMNS)
+    sp.add_argument("--rank", type=float, help="place in the column (lower goes first); in the same column only the place changes")
     cmd("inbox", cmd_inbox, "messages the humans left for the agent (read at the start of a round)")
+    sp = cmd("ask", cmd_ask, "ask the user for something; the card is for the user until they answer")
+    sp.add_argument("card")
+    sp.add_argument("text")
+    sp = cmd("requests", cmd_requests, "requests the agents left for the user (--all: every board)")
+    sp.add_argument("--all", action="store_true", help="across all boards (the automatic 'user' board)")
     sp = cmd("reply", cmd_reply, "answer message N of a card (closes it)")
     sp.add_argument("card")
     sp.add_argument("n", type=int)

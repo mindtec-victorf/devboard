@@ -233,3 +233,39 @@ def test_unknown_agent_gets_the_generic_icon(base_url, browser_page):
     page = browser_page
     page.goto(base_url + "#/p")
     page.locator('.card[data-id="21"] .agent svg[data-kind="generic"]').wait_for()
+
+
+def test_reorder_inside_a_column_keeps_it_automatic(base_url, browser_page):
+    page = browser_page
+    page.goto(base_url + "#/p")
+    page.locator('.card[data-id="21"]').wait_for()
+    page.drag_and_drop('.card[data-id="21"]', '.card[data-id="20"]', target_position={"x": 20, "y": 5})
+    page.get_by_text("Order saved.").wait_for()
+    c = store.Board("p").card("21")
+    assert c["rank"] < 1e6 and c.get("status") is None
+    ids = page.locator('.col[data-col="todo"] .card').evaluate_all("els => els.map(e => e.dataset.id)")
+    assert ids == ["21", "20"]
+    assert page.locator('.col[data-col="todo"] .cards').evaluate("e => getComputedStyle(e).overflowY") == "auto"
+
+
+def test_request_is_answered_on_the_card_and_goes_back(base_url, browser_page):
+    store.Board("p").ask("21", "Which domain?", by="claude-main")
+    page = browser_page
+    page.goto(base_url + "#/p/card/21")
+    page.get_by_text("The agent asks you").wait_for()
+    page.fill(".request textarea", "app.example.com")
+    page.click("[data-answer]")
+    page.get_by_text("Answer sent. The card went back to the agent.").wait_for()
+    assert store.Board("p").card("21")["assignee"] == "agent:claude-main"
+
+
+def test_user_board_lists_and_opens_the_original_card(base_url, browser_page):
+    store.Board("p").set("20", {"assignee": "user"}, by="codex")
+    page = browser_page
+    page.goto(base_url)
+    page.get_by_text("For you").first.wait_for()
+    page.goto(base_url + "#/user")
+    page.locator('.card[data-id="p:20"]').click()
+    page.wait_for_url("**/#/p/card/20")
+    page.locator("#assignee").wait_for()
+    assert page.locator("#assignee").input_value() == "user"

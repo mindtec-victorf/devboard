@@ -29,7 +29,9 @@ In any folder that has a board, follow this round:
 3. Run `devboard summary` and `devboard who`. Work only on a card nobody holds:
    `devboard claim <card> --note "what you will do"` (claim again to renew; claims expire after 2 h).
 4. Record as you go, one command per fact: `note`, `check`, `attach`, `set --next/--situation/--wait`.
-   Never read or edit the board files; many changes go in one `apply` file.
+   Never read or edit the board files; many changes go in one `apply` file. Need the person (a decision,
+   a credential, a manual test)? `devboard ask <card> "question"`; their answer comes back on the card.
+   Leave cards `--for agent:<other-name>` to that agent.
 5. When you stop: `devboard release <card> --note "done / next / watch out"`. `devboard --help` lists everything.
 
 If `devboard` is not on the PATH, use `python3 "{cli_path}"` instead.

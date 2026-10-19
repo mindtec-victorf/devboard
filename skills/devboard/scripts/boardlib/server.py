@@ -110,6 +110,8 @@ class Handler(BaseHTTPRequestHandler):
                     return self._send(200, b.pending())
                 if rest == ["inbox"]:
                     return self._send(200, b.inbox())
+                if rest == ["requests"]:
+                    return self._send(200, b.requests() if hasattr(b, "requests") else [])
                 if rest == ["claims"]:
                     return self._send(200, b.claims())
                 if len(rest) == 4 and rest[0] == "cards" and rest[2] == "files":
@@ -215,7 +217,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             b = store.open_board(parts[2])
             if b.readonly:
-                raise store.ReadOnly("rollout boards are read-only")
+                raise store.ReadOnly(f"board {b.id!r} is read-only")
             if len(rest) == 2 and rest[1] == "files":
                 return self._upload(b, rest[0], n)
             if n > MAX_BODY:
@@ -228,6 +230,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self._err(400, "body must be an object")
             if len(rest) == 2 and rest[1] == "message":
                 return self._send(201, b.message(rest[0], body.get("text"), by="human"))
+            if len(rest) == 2 and rest[1] == "reply":
+                n = body.get("n")
+                if isinstance(n, bool) or not isinstance(n, int):
+                    return self._err(400, "n must be the message number")
+                return self._send(200, b.reply(rest[0], n, body.get("text"), by="human"))
             if len(rest) == 2 and rest[1] == "detach":
                 return self._send(200, b.detach(rest[0], body.get("name"), by="human"))
             if not rest:
@@ -242,7 +249,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, b.check(rest[0], body.get("index"), body.get("done", True),
                                                by="human", etag=body["etag"]))
             if len(rest) == 2 and rest[1] == "move":
-                return self._send(200, b.move(rest[0], body.get("status"), by="human", etag=body["etag"]))
+                return self._send(200, b.move(rest[0], body.get("status"), by="human", etag=body["etag"],
+                                              rank=body.get("rank")))
         except store.Conflict as e:
             return self._err(409, str(e), card=e.current)
         except store.ReadOnly as e:

@@ -28,9 +28,10 @@ except ImportError:  # Windows
 ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,40}$")
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 ROLLOUT_PREFIX = "rollout-"
+USER_BOARD = "user"  # the automatic board of everything assigned to the person (userboard.py)
 TEXT_FIELDS = ("title", "blocked", "waiting", "estimate", "situation", "next")
-FIELD_ORDER = ("id", "title", "status", "started", "progress", "blocked", "waiting", "priority",
-               "tags", "estimate", "due", "situation", "next", "updated")
+FIELD_ORDER = ("id", "title", "status", "started", "progress", "blocked", "waiting", "assignee", "priority",
+               "rank", "tags", "estimate", "due", "situation", "next", "updated")
 FIELDS = frozenset(FIELD_ORDER) - {"id", "updated"}
 TEMPLATES = Path(__file__).resolve().parents[2] / "templates"
 
@@ -86,6 +87,50 @@ def check_agent(name):
     if not isinstance(name, str) or not AGENT_RE.match(name):
         raise BoardError("agent name must be 1-40 letters, digits, '.', '_' or '-' (e.g. codex-1, claude-review)")
     return name
+
+
+ASSIGNEE_RE = re.compile(r"^agent(?::([A-Za-z0-9][A-Za-z0-9._-]{0,39}))?(?:@(.+))?$")
+
+
+def parse_assignee(value):
+    """Who the card is for: "user" (the person) or "agent[:<name>][@<repo>]". Returns
+    {"kind": "user"|"agent", "name": str|None, "repo": str|None}; raises BoardError on anything else."""
+    text = str(value or "").strip()
+    if text == "user":
+        return {"kind": "user", "name": None, "repo": None}
+    m = ASSIGNEE_RE.match(text)
+    if not m:
+        raise BoardError("assignee must be user, agent, agent:<name>, agent@<repo> or agent:<name>@<repo>")
+    repo = m.group(2)
+    if repo is not None:
+        repo = repo.strip()
+        if not repo:
+            raise BoardError("assignee repo after '@' is empty")
+        repo = str(Path(repo).expanduser().resolve())
+    return {"kind": "agent", "name": m.group(1), "repo": repo}
+
+
+def format_assignee(parts):
+    if parts["kind"] == "user":
+        return "user"
+    return "agent" + (f":{parts['name']}" if parts.get("name") else "") + (f"@{parts['repo']}" if parts.get("repo") else "")
+
+
+def assignee_for(value, cwd=None, agent=None):
+    """True when a card assigned to `value` belongs to the agent `agent` working in `cwd`.
+    No name or no repo in the assignee means any agent / any folder of the board."""
+    if not value:
+        return False
+    p = parse_assignee(value)
+    if p["kind"] != "agent":
+        return False
+    if p["name"] and agent and p["name"] != agent:
+        return False
+    if p["repo"] and cwd:
+        here, rp = Path(cwd).expanduser().resolve(), Path(p["repo"])
+        if here != rp and rp not in here.parents:
+            return False
+    return True
 
 
 def parse_ttl(ttl):
@@ -191,6 +236,11 @@ def validate_changes(changes):
             if not isinstance(v, list) or not all(isinstance(t, str) and t.strip() for t in v):
                 raise BoardError("tags must be a list of non-empty texts")
             v = list(dict.fromkeys(t.strip() for t in v))
+        elif k == "rank":
+            if v is not None and (isinstance(v, bool) or not isinstance(v, (int, float)) or v != v or abs(v) > 1e15):
+                raise BoardError("rank must be a number (the card's place in its column; lower goes first) or null")
+        elif k == "assignee":
+            v = None if v in (None, "") else format_assignee(parse_assignee(v))
         elif k == "due" and v is not None:
             try:
                 if not DATE_RE.match(v):
@@ -203,16 +253,31 @@ def validate_changes(changes):
 
 
 def _messages(evs):
-    """Messages to the agent and their replies, replayed from a card's events."""
+    """Messages and their replies, replayed from a card's events. `to` is "agent" (a person asked the agent,
+    the default of older events) or "user" (an agent asked the person with `ask`)."""
     out = {}
     for ev in evs:
         if ev.get("kind") == "message":
             out[ev["n"]] = {"n": ev["n"], "ts": ev.get("ts"), "by": ev.get("by"), "text": ev.get("note", ""),
-                            "open": True, "reply": None}
+                            "to": ev.get("to", "agent"), "open": True, "reply": None}
+            if "prev_assignee" in ev:
+                out[ev["n"]]["prev_assignee"] = ev["prev_assignee"]
         elif ev.get("kind") == "reply" and ev.get("reply_to") in out:
             m = out[ev["reply_to"]]
             m["open"], m["reply"] = False, {"ts": ev.get("ts"), "by": ev.get("by"), "text": ev.get("note", "")}
     return list(out.values())
+
+
+def _hand_back(msg):
+    """Who gets the card back once the person answers a request: the agent assignee it had before the
+    request, else the agent who asked (agent:<name>), else any agent of the board."""
+    prev = msg.get("prev_assignee")
+    if prev and prev != "user":
+        return prev
+    asker = msg.get("by")
+    if asker and asker not in ("agent", "human") and AGENT_RE.match(asker):
+        return f"agent:{asker}"
+    return "agent"
 
 
 def _files(evs):
@@ -267,6 +332,8 @@ class Board:
         check_id("board", bid)
         if bid.startswith(ROLLOUT_PREFIX):
             raise BoardError(f"board ids starting with {ROLLOUT_PREFIX!r} are reserved for rollouts")
+        if bid == USER_BOARD:
+            raise BoardError(f"board id {USER_BOARD!r} is reserved for the automatic board of what is assigned to you")
         d = home() / bid
         if (d / "board.json").exists():
             raise BoardError(f"board {bid!r} already exists")
@@ -334,11 +401,13 @@ class Board:
         card, md, etag = self._read(cid)
         prog = derive.progress(card, md)
         evs = self.events(cid)
+        msgs = _messages(evs)
         return dict(card, progress=prog, progress_source=derive.progress_source(md),
                     checklist=[len(items), sum(1 for _, done, _ in items if done)] if (items := derive.checklist(md)) else None,
                     column=derive.column(card, prog), etag=etag,
-                    messages_open=sum(1 for m in _messages(evs) if m["open"]), files_count=len(_files(evs)),
-                    claimed_by=_claim(evs))
+                    messages_open=sum(1 for m in msgs if m["open"] and m["to"] == "agent"),
+                    requests_open=sum(1 for m in msgs if m["open"] and m["to"] == "user"),
+                    files_count=len(_files(evs)), claimed_by=_claim(evs))
 
     def cards(self):
         return [self.card(c) for c in self.card_ids()]
@@ -453,13 +522,17 @@ class Board:
         self._read(cid)
         return _messages(self.events(cid))
 
-    def inbox(self):
-        """Open messages to the agent across the board, oldest first."""
+    def inbox(self, to="agent"):
+        """Open messages across the board, oldest first: to the agent (default) or to the user (requests)."""
         out = []
         for cid in self.card_ids():
             title = self._read(cid)[0].get("title")
-            out += [dict(m, card=cid, title=title) for m in _messages(self.events(cid)) if m["open"]]
+            out += [dict(m, card=cid, title=title) for m in _messages(self.events(cid)) if m["open"] and m["to"] == to]
         return sorted(out, key=lambda m: (_ts(m["ts"]), m["card"], m["n"]))
+
+    def requests(self):
+        """Open requests the agents left for the user (`ask`), oldest first."""
+        return self.inbox(to="user")
 
     def claims(self):
         """Active claims across the board: who is working on what, until when."""
@@ -517,7 +590,16 @@ class Board:
             atomic_write(j, canonical({"id": cid, **data, "updated": now()}))
             created = {k: [None, v] for k, v in data.items() if v is not None and v != []}
             self._event(cid, by, "create", changes=created, src=src)
+        if data.get("assignee") == "user":
+            self._tell_user(cid, by, data["title"], None)
         return self.card(cid)
+
+    def _tell_user(self, cid, by, title, text):
+        """Desktop notice when an agent hands something to the person. The person's own writes stay quiet."""
+        if by == "human":
+            return
+        from . import notify
+        notify.user(self.meta.get("title") or self.id, f"#{cid} {title}" + (f": {text}" if text else ""))
 
     def set(self, cid, changes, note=None, by="agent", etag=None, src=None):
         by = check_by(by)
@@ -543,6 +625,8 @@ class Board:
                 card["updated"] = now()
                 atomic_write(self.paths(cid)[0], canonical(card))
             self._event(cid, by, "set" if diff else "note", changes=diff or None, note=note, src=src)
+        if diff.get("assignee", [None, None])[1] == "user":
+            self._tell_user(cid, by, card.get("title"), note)
         return self.card(cid)
 
     def note(self, cid, text, by="agent", src=None):
@@ -579,12 +663,17 @@ class Board:
         return self.card(cid)
 
 
-    def move(self, cid, status, by="human", etag=None, src=None):
-        """A drag on the page: sets the status; leaving Bloqueada clears blocked/waiting in the same event."""
+    def move(self, cid, status, by="human", etag=None, src=None, rank=None):
+        """A drag on the page: sets the status; leaving Bloqueada clears blocked/waiting in the same event.
+        With `rank`, the card also takes that place in the column; a reorder inside the card's current
+        column changes only the rank, so an automatic column stays automatic."""
         if status not in derive.COLUMNS:
             raise BoardError(f"status must be one of {', '.join(derive.COLUMNS)}")
-        changes = {"status": status}
-        if status != "blocked" and self.card(cid)["column"] == "blocked":
+        column = self.card(cid)["column"]
+        changes = {} if rank is not None and status == column else {"status": status}
+        if rank is not None:
+            changes["rank"] = rank
+        if status != "blocked" and column == "blocked":
             changes.update(blocked=None, waiting=None)
         return self.set(cid, changes, by=by, etag=etag, src=src)
 
@@ -631,19 +720,46 @@ class Board:
             self._event(cid, by, "message", note=text, src=src, n=n)
         return next(m for m in self.messages(cid) if m["n"] == n)
 
+    def ask(self, cid, text, by="agent", src=None):
+        """An agent asks the person for something (a decision, a credential, a test). The card is assigned
+        to the user until the person answers; the answer hands it back to whoever asked (see reply)."""
+        by = check_by(by)
+        text = text.strip() if isinstance(text, str) else ""
+        if not text:
+            raise BoardError("request is empty")
+        with self._lock():
+            card = self._read(cid)[0]
+            n = 1 + max((m["n"] for m in _messages(self.events(cid))), default=0)
+            prev = card.get("assignee")
+            self._event(cid, by, "message", note=text, src=src, n=n, to="user", prev_assignee=prev)
+            if prev != "user":
+                card.update(assignee="user", updated=now())
+                atomic_write(self.paths(cid)[0], canonical(card))
+                self._event(cid, by, "set", changes={"assignee": [prev, "user"]}, src=src)
+        self._tell_user(cid, by, card.get("title"), text)
+        return next(m for m in self.messages(cid) if m["n"] == n)
+
     def reply(self, cid, n, text, by="agent", src=None):
         by = check_by(by)
         text = text.strip() if isinstance(text, str) else ""
         if not text:
             raise BoardError("reply is empty")
         with self._lock():
-            self._read(cid)
-            m = next((m for m in _messages(self.events(cid)) if m["n"] == n), None)
+            card = self._read(cid)[0]
+            msgs = _messages(self.events(cid))
+            m = next((m for m in msgs if m["n"] == n), None)
             if m is None:
                 raise NotFound(f"message {n} not found on card {cid!r}")
             if not m["open"]:
                 raise BoardError(f"message {n} already answered")
             self._event(cid, by, "reply", note=text, src=src, reply_to=n)
+            still_open = any(x["open"] and x["to"] == "user" and x["n"] != n for x in msgs)
+            if m["to"] == "user" and not still_open and card.get("assignee") == "user":
+                back = _hand_back(m)
+                card["assignee"] = back
+                card["updated"] = now()
+                atomic_write(self.paths(cid)[0], canonical(card))
+                self._event(cid, by, "set", changes={"assignee": ["user", back]}, src=src)
         return next(m for m in self.messages(cid) if m["n"] == n)
 
     def _commit_file(self, cid, tmp, name, size, sha1, by, src):
@@ -732,9 +848,11 @@ def list_boards():
 
 
 def open_board(bid):
-    from . import rollout
+    from . import rollout, userboard
     if isinstance(bid, str) and bid.startswith(ROLLOUT_PREFIX):
         return rollout.open_rollout(bid)
+    if bid == USER_BOARD:
+        return userboard.UserBoard()
     return Board(bid)
 
 
@@ -798,9 +916,24 @@ def unarchive(bid, by="agent"):
 
 
 def overview():
-    """One row per board for the home screen: grouped by origin repo, with column counts and activity."""
+    """One row per board for the home screen: grouped by origin repo, with column counts and activity.
+    The automatic "user" board comes first, and only while something is assigned to the person."""
+    from . import userboard
     out, hidden = [], archived()
+    mine = userboard.UserBoard().cards()
+    if mine:
+        cols = list(userboard.COLUMNS)
+        stamps = [c.get("updated") for c in mine if c.get("updated")]
+        known = [c["progress"] for c in mine if c.get("progress") is not None]
+        out.append({"id": USER_BOARD, "kind": "user", "archived": False, "title": userboard.TITLE,
+                    "cards": len(mine), "done": 0, "group": None, "group_name": None, "group_label": None,
+                    "counts": {k: sum(1 for c in mine if c["column"] == k) for k in cols},
+                    "avg": round(sum(known) / len(known)) if known else None, "messages_open": 0,
+                    "requests_open": sum(c.get("requests_open", 0) for c in mine),
+                    "updated": max(stamps, key=_ts) if stamps else None})
     for bid, kind in list_boards():
+        if bid == USER_BOARD:
+            continue
         row = {"id": bid, "kind": kind, "archived": bid in hidden}
         try:
             b = open_board(bid)
@@ -821,5 +954,6 @@ def overview():
                         counts={k: sum(1 for c in cs if c["column"] == k) for k in cols},
                         avg=round(sum(known) / len(known)) if known else None,
                         messages_open=sum(c.get("messages_open", 0) for c in cs),
+                        requests_open=sum(c.get("requests_open", 0) for c in cs),
                         updated=max(stamps, key=_ts) if stamps else b.meta.get("created")))
     return out

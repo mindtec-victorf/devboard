@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.6.0
+- Who a card is for: `--for user|agent|agent:<name>|agent@<repo>|agent:<name>@<repo>` on `add` and `set`
+  (`--para` is an alias, `--unassign` clears it), shown on the card and changeable from the page.
+- Agents ask the person: `devboard ask <card> "text"` assigns the card to the user until they answer on the page;
+  the answer hands the card back to the agent that asked. `devboard requests` (`--all` for every board) lists them;
+  `apply` takes an `ask` op.
+- The automatic **For you** board (`user`, read-only, built on each read): every open card from every active board
+  that is for the user or waits for their answer. It comes first on the home screen while it has cards. The board
+  id `user` is now reserved.
+- Desktop notice when an agent hands something to the person (Windows toast, macOS Notification Center,
+  `notify-send`), or any command in `DEVBOARD_NOTIFY_CMD`; `DEVBOARD_NOTIFY=0` turns it off.
+- The Claude Code hook also runs on every prompt and tells the agent only what is new: messages from people,
+  cards assigned to it, and the person's answers to its requests.
+- Manual order: drag a card up or down inside its column (`rank`; `move --rank` in the CLI). A reorder inside the
+  card's own column does not pin it there.
+- Columns scroll on their own, so a long column no longer stretches the page.
+
 ## 0.5.0
 - Agent icons on claims and in the history, picked from the first word of the agent's name (Claude, Gemini,
   GitHub Copilot, Cursor; Codex and unknown names get a neutral icon). Built by `docs/make-agent-icons.py`

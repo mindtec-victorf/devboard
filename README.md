@@ -38,8 +38,10 @@ devboard replaces that with a board:
 ## Features
 
 - 🤖 **Works with Claude Code, Codex, Gemini CLI, Cursor, GitHub Copilot** and any agent that reads `AGENTS.md`
-- 🗂️ **Kanban in the browser.** Drag cards between columns, tick checklists, search, filter by priority
-- 💬 **Messages to your agents.** They read them first thing and reply on the card
+- 🗂️ **Kanban in the browser.** Drag cards between columns and up or down inside one, tick checklists, search, filter by priority
+- 💬 **Messages both ways.** You leave messages for your agents; they ask you for decisions, credentials or tests with `devboard ask`
+- 👤 **Who a card is for.** `--for user` or `--for agent[:<name>][@<repo>]`; everything that is for you lands on an automatic **For you** board, across all projects
+- 🔔 **Notices.** A desktop notification when an agent hands you something; agents hear about new messages and answers on their next prompt
 - 🙋 **Claims.** An agent marks the card it is working on, with its tool's icon (Claude, Gemini, Copilot, Cursor…); claims expire on their own
 - 📎 **Attachments.** PRDs, screenshots, PDFs and videos, with previews
 - 🧾 **Full history.** Every change records who made it and when; `devboard audit` checks nothing was edited by hand
@@ -110,7 +112,32 @@ The skill teaches every agent the same routine:
 6. **Hand off when done:** `devboard release <card> --note "done / next / watch out"`.
 
 In Claude Code, the plugin reminds the agent at the start of each session that a board exists and how
-many messages are waiting.
+many messages are waiting. After that, each prompt brings only what is new since the agent last heard:
+a message from you, a card assigned to it, your answer to its request.
+
+### Handing work to the person
+
+When only you can do something (decide, sign in to a panel, pay, test by hand), the agent asks on the card:
+
+```console
+$ devboard ask 4 "Which domain should the passkey use?"
+4#1 asked the user; the card is assigned to user until they answer
+```
+
+The card is now **for you**: it shows on the **For you** board and your desktop shows a notice. You answer
+on the card page; the card goes back to the agent that asked, and that agent reads your answer on its next
+prompt. Without a question, `devboard set 4 --for user --note "needs the Render card"` hands the card over.
+
+Who a card is for:
+
+| `--for` | Meaning |
+|---|---|
+| `user` | the person driving the board |
+| `agent` | any agent working in the board's folders |
+| `agent:<name>` | one agent, by its `DEVBOARD_AGENT` name |
+| `agent@<repo>` · `agent:<name>@<repo>` | an agent working in that folder |
+
+`--para` is an alias of `--for`; `--unassign` clears it.
 
 ### Several agents at once
 
@@ -132,11 +159,13 @@ Claims coordinate; they don't lock anything. You can still change any card from 
 |---|---|
 | ![Board](docs/screenshots/board.png) | ![Card](docs/screenshots/card.png) |
 
-- **Drag** a card to change its column.
+- **Drag** a card to change its column, or up and down to reorder it. Long columns scroll on their own.
 - **Tick** checklist items; the progress bar follows.
 - **Drop files** on a card to attach them.
 - **Leave a message** for the agent; you'll see its reply on the card.
-- **See who** is working on a card, until when, and why.
+- **See who** is working on a card, until when, and why, and **who it is for**; change it from the card.
+- **Answer the agents' requests** right on the card. The **For you** board, first on the home screen,
+  gathers every card that is for you or waits for your answer, from all your boards.
 
 The home screen lists every board you have, grouped by repository:
 
@@ -163,13 +192,14 @@ Running `setup-agent` again updates the instructions in place.
 | Command | What it does |
 |---|---|
 | `init <id> --title T --repo <folder>` | Create a board linked to a folder |
-| `add <card> --title T` | Add a card (`--priority`, `--tag`, `--estimate`, `--due`, `--next`) |
-| `set <card> ...` | Change a card (`--progress`, `--block`, `--wait`, `--next`, `--status`, `--note`) |
+| `add <card> --title T` | Add a card (`--priority`, `--tag`, `--estimate`, `--due`, `--next`, `--for`) |
+| `set <card> ...` | Change a card (`--progress`, `--block`, `--wait`, `--next`, `--status`, `--for`/`--unassign`, `--note`) |
 | `note <card> "text"` | Record a milestone |
 | `check <card> <n>` | Tick checklist item *n* (`--undo` to untick) |
-| `move <card> <column>` | Move a card: `todo`, `blocked`, `doing`, `final`, `done` |
+| `move <card> <column>` | Move a card: `todo`, `blocked`, `doing`, `final`, `done` (`--rank` sets its place; lower goes first) |
 | `claim <card>` · `release <card>` · `who` | Claim a card, release it, list claims |
 | `inbox` · `reply <card> <n> "text"` | Read messages · answer one |
+| `ask <card> "text"` · `requests` | Ask the person for something · list what waits for them (`--all`: every board) |
 | `attach <card> <file>` · `files <card>` · `detach <card> <name>` | Attachments (`--link` keeps the file where it is) |
 | `summary` · `show <card>` · `history` · `pending` | Read the board (`--json` for scripts) |
 | `boards` · `archive <id>` · `unarchive <id>` | Manage boards |
@@ -192,6 +222,8 @@ Every command has `--help`. Exit codes: `0` ok, `1` problems found, `2` usage er
 | `DEVBOARD_LANG` | `en` | Language of the page: `en`, `es`, `fr`, `de`, `it`, `ja`, `zh-CN`. Each file in `skills/devboard/web/i18n/` is a language; to add one, copy `en.json` and translate it |
 | `DEVBOARD_TEMPLATE` | `stages` | Template used by `init` |
 | `DEVBOARD_ROLLOUTS` | `~/.devboard/rollouts` | Folders scanned for rollout ledgers |
+| `DEVBOARD_NOTIFY` | `1` | `0` turns off the desktop notice when an agent hands you something |
+| `DEVBOARD_NOTIFY_CMD` | — | A shell command to run instead of the desktop notice (phone push, chat webhook…); it gets `DEVBOARD_NOTIFY_TITLE` and `DEVBOARD_NOTIFY_BODY` |
 
 In Claude Code you can set them in `settings.json`, under `"env"`.
 
