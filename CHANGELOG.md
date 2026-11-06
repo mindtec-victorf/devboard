@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.1
+- No `bin/` folder: claude.ai-hosted marketplaces refuse plugins that ship one. The launcher moved to
+  `scripts/devboard` (`install.sh` links it as before); the hooks run it with `bash`; in Claude Code the
+  skill calls `devboard.py` by its full path.
+- No `.cmd` in the repo (antivirus flags them): `install.ps1` writes the Windows shim itself.
+
 ## 0.6.0
 - Who a card is for: `--for user|agent|agent:<name>|agent@<repo>|agent:<name>@<repo>` on `add` and `set`
   (`--para` is an alias, `--unassign` clears it), shown on the card and changeable from the page.

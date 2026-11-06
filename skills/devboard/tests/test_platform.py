@@ -45,7 +45,7 @@ def test_hook_command_finds_a_python(tmp_path):
 
 
 def test_windows_launcher_and_installer_exist():
-    cmd = (ROOT / "bin" / "devboard.cmd").read_text(encoding="utf-8")
-    assert "py -3" in cmd and "python" in cmd
+    assert not (ROOT / "bin").exists()  # claude.ai-hosted plugins may not ship bin/
     ps1 = (ROOT / "install.ps1").read_text(encoding="utf-8")
+    assert "py -3" in ps1 and "devboard.py" in ps1
     assert "LOCALAPPDATA" in ps1 and "setup-agent" in ps1 and "Junction" in ps1

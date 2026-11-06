@@ -35,7 +35,10 @@ if ($env:DEVBOARD_SRC) {                      # a local checkout (development, C
 
 New-Item -ItemType Directory -Force -Path $Bin | Out-Null
 $shim = Join-Path $Bin "devboard.cmd"
-Set-Content -Path $shim -Encoding oem -Value "@call `"$App\bin\devboard.cmd`" %*"
+$script = Join-Path $App "skills\devboard\scripts\devboard.py"
+Set-Content -Path $shim -Encoding oem -Value @(   # written here: the repo ships no .cmd (antivirus flags them)
+  "@echo off", "where py >nul 2>nul", "if not errorlevel 1 (", "  py -3 `"$script`" %*", "  exit /b", ")",
+  "python `"$script`" %*")
 $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
 if (-not (($userPath -split ";") -contains $Bin)) {
   [Environment]::SetEnvironmentVariable("Path", (($userPath, $Bin) | Where-Object { $_ }) -join ";", "User")

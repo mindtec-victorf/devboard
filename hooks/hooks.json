@@ -6,8 +6,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "py=$(command -v python3 || command -v python || command -v py); \"$py\" \"${CLAUDE_PLUGIN_ROOT}/skills/devboard/scripts/devboard.py\" hook",
-            "timeout": 10
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/devboard\" hook",
+            "timeout": 10,
+            "shell": "bash"
           }
         ]
       }
@@ -17,8 +18,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "py=$(command -v python3 || command -v python || command -v py); \"$py\" \"${CLAUDE_PLUGIN_ROOT}/skills/devboard/scripts/devboard.py\" hook",
-            "timeout": 5
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/devboard\" hook",
+            "timeout": 5,
+            "shell": "bash"
           }
         ]
       }
