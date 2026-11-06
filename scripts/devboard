@@ -1,0 +1,6 @@
+#!/bin/sh
+# devboard CLI launcher: install.sh links it into ~/.local/bin; the Claude Code hooks run it with bash.
+# Finds python3, python or py (Git Bash on Windows often has only the last two).
+py=$(command -v python3 || command -v python || command -v py) || { echo "devboard needs Python 3.10+" >&2; exit 1; }
+self=$(readlink -f "$0" 2>/dev/null || "$py" -c 'import os,sys;print(os.path.realpath(sys.argv[1]))' "$0")
+exec "$py" "$(dirname "$self")/../skills/devboard/scripts/devboard.py" "$@"

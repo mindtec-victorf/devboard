@@ -22,8 +22,8 @@ else
 fi
 
 mkdir -p "$BIN"
-chmod +x "$APP/bin/devboard" 2>/dev/null || true
-ln -sf "$APP/bin/devboard" "$BIN/devboard"
+chmod +x "$APP/scripts/devboard" 2>/dev/null || true
+ln -sf "$APP/scripts/devboard" "$BIN/devboard"
 echo "devboard: CLI at $BIN/devboard"
 
 for agent_home in "$HOME/.codex" "$HOME/.copilot"; do   # agents that read Agent Skills (SKILL.md) folders

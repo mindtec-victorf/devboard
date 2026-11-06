@@ -10,8 +10,9 @@ agent's, a person's on the page — goes through the same door: lock, validate, 
 one event with who and when. That is what lets several agents and a person work on the same project
 without stepping on each other and without anyone re-reading everything to catch up.
 
-The CLI is `scripts/devboard.py` next to this file (or `devboard` when installed on the PATH). Below,
-`devboard` means either.
+The CLI is `scripts/devboard.py` next to this file. In Claude Code run it as
+`python3 "${CLAUDE_PLUGIN_ROOT}/skills/devboard/scripts/devboard.py"` (the plugin puts nothing on the PATH);
+the standalone installer adds a `devboard` command. Below, `devboard` means either.
 
 ## Who you are
 
