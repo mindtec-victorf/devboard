@@ -6,6 +6,8 @@
   its cards. `ask` prints the command.
 - The hook on each prompt also reports what the person changed on the agent's cards. While a request is
   open, it reminds the agent to record on the card an answer the person gives in the chat.
+- Two boards on the same folder (a project and its client) are both heard: the hook reads every board
+  whose repo is the deepest match for the agent's folder (`store.resolve_all`), not only the first.
 
 ## 0.8.0
 - The **For you** board takes drags. A drag to another column changes the source card's status. Dropping

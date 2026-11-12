@@ -857,10 +857,11 @@ def open_board(bid):
     return links.LinkedBoard(bid) if b.meta.get("links") else b
 
 
-def resolve(cwd):
-    """The local board whose repos contain cwd; the deepest repo path wins; None if none."""
+def resolve_all(cwd):
+    """Every active local board whose repos contain cwd at the deepest matching path, by id. Two boards
+    can share a folder (a project board and its client's board): an agent there works for both."""
     cwd = Path(cwd).expanduser().resolve()
-    best, depth = None, -1
+    found, depth = [], -1
     hidden = archived()
     for bid, kind in list_boards():
         if kind != "board" or bid in hidden:
@@ -869,11 +870,18 @@ def resolve(cwd):
             repos = Board(bid).meta.get("repos", [])
         except (BoardError, ValueError):
             continue
-        for r in repos:
-            rp = Path(r)
-            if (cwd == rp or rp in cwd.parents) and len(rp.parts) > depth:
-                best, depth = bid, len(rp.parts)
-    return best
+        d = max((len(Path(r).parts) for r in repos if cwd == Path(r) or Path(r) in cwd.parents), default=-1)
+        if d > depth:
+            found, depth = [bid], d
+        elif d == depth and d >= 0:
+            found.append(bid)
+    return found
+
+
+def resolve(cwd):
+    """The local board whose repos contain cwd; the deepest repo path wins (the first id on a tie); None if none."""
+    found = resolve_all(cwd)
+    return found[0] if found else None
 
 
 ARCHIVE_LOG = "_archive.jsonl"

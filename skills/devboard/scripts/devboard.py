@@ -463,37 +463,45 @@ def _load_seen(path):
 def cmd_hook(a):
     """Claude Code hook (SessionStart and UserPromptSubmit): reads the hook JSON on stdin and prints
     additionalContext only inside a board's repo. SessionStart gives the one-line summary; each prompt
-    after that adds only what is new since the agent last heard (messages, assignments, answers)."""
+    after that adds only what is new since the agent last heard (messages, assignments, answers, the
+    person's edits) and the requests still open. Every board of the folder counts (store.resolve_all)."""
     try:
         payload = json.loads(sys.stdin.read() or "{}")
         event = payload.get("hook_event_name") or "SessionStart"
         cwd = payload.get("cwd") or os.getcwd()
-        bid = store.resolve(cwd)
-        if not bid:
+        bids = store.resolve_all(cwd)
+        if not bids:
             return
-        b = store.Board(bid)
+        boards = [store.Board(bid) for bid in bids]
         seen_path = _seen_file(payload.get("session_id"))
-        news = _news(b, cwd)
+        news, asks = {}, []
+        for i, b in enumerate(boards):
+            tag = "" if i == 0 else f"[{b.id}] "  # the first board keeps the keys older sessions saved
+            for key, line in _news(b, cwd).items():
+                news[key if i == 0 else f"{b.id}|{key}"] = tag + line
+            if event == "UserPromptSubmit":
+                asks += [f"{tag}{c['id']}#{m['n']} \"{m['text'][:120]}\"" for c in b.cards() if c.get("requests_open")
+                         for m in b.messages(c["id"]) if _asked_here(m, cwd, None)]
         if event == "UserPromptSubmit":
             if seen_path is None:
                 return
             seen = _load_seen(seen_path)
             fresh = [line for key, line in news.items() if key not in seen]
             store.atomic_write(seen_path, json.dumps(sorted(seen | set(news))))
-            asks = [f"{c['id']}#{m['n']} \"{m['text'][:120]}\"" for c in b.cards() if c.get("requests_open")
-                    for m in b.messages(c["id"]) if _asked_here(m, cwd, None)]
             if not fresh and not asks:
                 return
-            text = ("New on board " + bid + " since your last turn:\n- " + "\n- ".join(fresh)) if fresh else ""
+            where = ", ".join(bids)
+            text = (f"New on board {where} since your last turn:\n- " + "\n- ".join(fresh)) if fresh else ""
             if asks:
                 text += ("\n" if text else "") + (
-                    "Open requests to the person from agents here: " + "; ".join(asks) + ". If this message answers "
-                    "or discusses one, record it on the board now (devboard.py reply <card> <n> \"...\" or note), "
-                    "so the board stays the one place to follow the work.")
+                    "Open requests to the person from agents here: " + "; ".join(asks[:5])
+                    + (f" and {len(asks) - 5} more (devboard.py requests)" if len(asks) > 5 else "") + ". If this message answers "
+                    "or discusses one, record it on the board now (devboard.py reply <card> <n> \"...\" --board <id>, "
+                    "or note), so the board stays the one place to follow the work.")
         else:
             if seen_path is not None:
                 store.atomic_write(seen_path, json.dumps(sorted(news)))
-            text = hint_line(bid, b.cards(), cwd)
+            text = "\n".join(hint_line(b.id, b.cards(), cwd) for b in boards)
         print(json.dumps({"hookSpecificOutput": {"hookEventName": event,
                                                  "additionalContext": f"<devboard>\n{text}\n</devboard>"}}))
     except Exception:  # noqa: BLE001 — a hook must never break a session or a prompt

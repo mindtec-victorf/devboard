@@ -321,3 +321,14 @@ def test_wait_times_out_with_exit_1(board, capsys, monkeypatch):
 def test_ask_prints_how_to_wait(board, capsys):
     code, out, _ = run(["ask", "2", "domain?", "--board", "proj", "--by", "codex"], capsys)
     assert code == 0 and "wait --board proj --as codex" in out
+
+
+def test_hook_hears_every_board_of_the_folder(board, monkeypatch, capsys, tmp_path):
+    repo = str(tmp_path / "repo")
+    client = store.Board.init("proj-client", "Client", [repo])
+    client.add("9", "Install")
+    assert store.resolve_all(repo) == ["proj", "proj-client"] and store.resolve(repo) == "proj"
+    hook(monkeypatch, capsys, {"hook_event_name": "SessionStart", "cwd": repo, "session_id": "s3"})
+    client.message("9", "send me the link", by="human")
+    news = hook(monkeypatch, capsys, {"hook_event_name": "UserPromptSubmit", "cwd": repo, "session_id": "s3"})
+    assert "[proj-client] 9#1 human asks the agent: send me the link" in news["additionalContext"]
