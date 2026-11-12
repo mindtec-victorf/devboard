@@ -282,3 +282,42 @@ def test_rank_must_be_a_number(board, bad):
 def test_cli_move_rank(board, capsys):
     code, _, _ = run(["move", "2", "todo", "--board", "proj", "--rank", "-3"], capsys)
     assert code == 0 and board.card("2")["rank"] == -3
+
+
+# --- the agent hears the person: wait, human edits, requests discussed in the chat ---
+
+def test_prompt_hook_reports_human_edits_and_open_requests(board, monkeypatch, capsys, tmp_path):
+    repo = str(tmp_path / "repo")
+    board.set("1", {"assignee": "agent"})
+    hook(monkeypatch, capsys, {"hook_event_name": "SessionStart", "cwd": repo, "session_id": "s2"})
+    board.note("1", "tested on staging", by="human")
+    news = hook(monkeypatch, capsys, {"hook_event_name": "UserPromptSubmit", "cwd": repo, "session_id": "s2"})
+    assert "1: the person changed it on the board" in news["additionalContext"] and "tested on staging" in news["additionalContext"]
+    board.ask("2", "which domain?", by="codex")
+    news = hook(monkeypatch, capsys, {"hook_event_name": "UserPromptSubmit", "cwd": repo, "session_id": "s2"})
+    assert "Open requests to the person" in news["additionalContext"] and '2#1 "which domain?"' in news["additionalContext"]
+    news = hook(monkeypatch, capsys, {"hook_event_name": "UserPromptSubmit", "cwd": repo, "session_id": "s2"})
+    assert "New on board" not in news["additionalContext"] and "record it on the board" in news["additionalContext"]
+
+
+def test_wait_ends_when_the_person_acts(board, capsys, monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path / "repo")
+    board.ask("2", "which domain?", by="codex")
+    capsys.readouterr()
+    sleeps = iter([lambda: None, lambda: board.reply("2", 1, "app.example.com", by="human")])
+    monkeypatch.setattr(devboard.time, "sleep", lambda s: next(sleeps)())
+    code, out, _ = run(["wait", "--board", "proj", "--as", "codex"], capsys)
+    assert code == 0 and "the user answered codex's request" in out and "app.example.com" in out
+
+
+def test_wait_times_out_with_exit_1(board, capsys, monkeypatch):
+    clock = iter([0, 0, 10 ** 6])
+    monkeypatch.setattr(devboard.time, "monotonic", lambda: next(clock))
+    monkeypatch.setattr(devboard.time, "sleep", lambda s: None)
+    code, out, _ = run(["wait", "--board", "proj", "--timeout", "30m"], capsys)
+    assert code == 1 and "nothing new" in out
+
+
+def test_ask_prints_how_to_wait(board, capsys):
+    code, out, _ = run(["ask", "2", "domain?", "--board", "proj", "--by", "codex"], capsys)
+    assert code == 0 and "wait --board proj --as codex" in out

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.0
+- Agents hear the person while idle: `devboard wait --board <id> --as <agent>` runs in the background
+  and ends, waking the agent, when the person answers, writes to it, or moves, edits, ticks or attaches on
+  its cards. `ask` prints the command.
+- The hook on each prompt also reports what the person changed on the agent's cards. While a request is
+  open, it reminds the agent to record on the card an answer the person gives in the chat.
+
 ## 0.8.0
 - The **For you** board takes drags. A drag to another column changes the source card's status. Dropping
   a card on Done delivers it: the source card is marked done and the card leaves For you. The Done column

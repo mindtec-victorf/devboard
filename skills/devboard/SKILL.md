@@ -50,6 +50,11 @@ word also picks the icon people see next to your claims (`claude`, `gemini`, `co
    Ask on the card instead: `devboard ask <card> "Which domain for the passkey?"`. The card becomes
    **for the user**, lands on their **For you** board and pops a desktop notice. Their answer hands the card
    back to you, and you hear it on your next prompt. Never put a secret in the question or expect one in the answer.
+   **Then listen while idle:** run `devboard wait --board <id> --as <you>` in the background (Claude Code:
+   `run_in_background`). It ends, and wakes you, when the person answers, writes to you, or moves, edits,
+   ticks or attaches on your cards; act on what it prints, then start it again.
+   **The person answers in the chat instead?** Record it on the card at once (`reply <card> <n> "..."` or
+   `note`), so the board stays the one place to follow the work. The hook reminds you while a request is open.
 7. **Hand off when you stop.** `devboard release <card> --note "done: X; next: Y; watch out for Z"`.
    The next agent reads that note in `who`/`show` and starts where you stopped.
 

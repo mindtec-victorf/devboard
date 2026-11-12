@@ -11,6 +11,7 @@ import json
 import os
 import re
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -308,6 +309,29 @@ def cmd_ask(a):
     m = b.ask(a.card, a.text, by=a.by)
     print(f"{a.card}#{m['n']} asked the user; the card is assigned to user until they answer "
           f"(devboard.py requests shows what is open)")
+    print(f"tip: to hear the answer even while idle, run this in the background and act when it ends: "
+          f"python3 {Path(__file__).resolve()} wait --board {b.id}" + (f" --as {a.by}" if a.by != "agent" else ""))
+
+
+def cmd_wait(a):
+    """Block until the person does something on this agent's cards, print it and exit 0 (1 on timeout).
+    Run it in the background (Claude Code: run_in_background): its end wakes the idle agent."""
+    b = pick(a)
+    cwd, agent = os.getcwd(), a.as_ or os.environ.get("DEVBOARD_AGENT")
+    seen, rev = set(_news(b, cwd, agent)), b.rev()
+    deadline = time.monotonic() + store.parse_ttl(a.timeout)
+    while time.monotonic() < deadline:
+        time.sleep(a.every)
+        b = store.open_board(b.id)
+        if b.rev() == rev:
+            continue
+        rev = b.rev()
+        fresh = [line for key, line in _news(b, cwd, agent).items() if key not in seen]
+        if fresh:
+            print(f"New on board {b.id}:\n- " + "\n- ".join(fresh))
+            return 0
+    print(f"nothing new on board {b.id} for {a.timeout}; run wait again to keep listening")
+    return 1
 
 
 def cmd_requests(a):
@@ -391,15 +415,31 @@ def hint_line(bid, cs, cwd=None):
 SESSION_RE = re.compile(r"[^A-Za-z0-9_-]")
 
 
-def _news(b, cwd):
+def _asked_here(m, cwd, agent):
+    """An open request to the person that, once answered, goes back to an agent working here."""
+    return m["to"] == "user" and m["open"] and store.assignee_for(store._hand_back(m), cwd, agent)
+
+
+def _news(b, cwd, agent=None):
     """{key: line} of what an agent working in cwd should hear about: messages from people, cards assigned
-    to agents here, and the person's answers to agents' requests. Keys are stable, so each is told once."""
-    agent = os.environ.get("DEVBOARD_AGENT")
+    to agents here, the person's answers to agents' requests, and anything else the person did on the
+    cards of agents here (moved, edited, ticked, attached). Keys are stable, so each is told once."""
+    agent = agent or os.environ.get("DEVBOARD_AGENT")
     out = {}
     for c in b.cards():
+        if c.get("missing"):
+            continue
+        msgs = b.messages(c["id"])
+        claimed = (c.get("claimed_by") or {}).get("agent")
+        mine = store.assignee_for(c.get("assignee"), cwd, agent) or (claimed and claimed == agent) \
+            or any(_asked_here(m, cwd, agent) for m in msgs)
         if c["column"] != "done" and store.assignee_for(c.get("assignee"), cwd, agent):
             out[f"a:{c['id']}:{c['assignee']}"] = f"card {c['id']} is assigned to {c['assignee']}: {c['title']}"
-        for m in b.messages(c["id"]):
+        if mine:
+            for i, ev in enumerate(b.events(c["id"])):
+                if ev.get("by") == "human" and ev.get("kind") not in ("message", "reply"):
+                    out[f"h:{c['id']}:{i}"] = f"{c['id']}: the person changed it on the board: {ev_line(ev)}"
+        for m in msgs:
             if m["to"] == "agent" and m["open"]:
                 out[f"m:{c['id']}:{m['n']}"] = f"{c['id']}#{m['n']} {m['by']} asks the agent: {m['text']}"
             elif m["to"] == "user" and not m["open"]:
@@ -440,9 +480,16 @@ def cmd_hook(a):
             seen = _load_seen(seen_path)
             fresh = [line for key, line in news.items() if key not in seen]
             store.atomic_write(seen_path, json.dumps(sorted(seen | set(news))))
-            if not fresh:
+            asks = [f"{c['id']}#{m['n']} \"{m['text'][:120]}\"" for c in b.cards() if c.get("requests_open")
+                    for m in b.messages(c["id"]) if _asked_here(m, cwd, None)]
+            if not fresh and not asks:
                 return
-            text = "New on board " + bid + " since your last turn:\n- " + "\n- ".join(fresh)
+            text = ("New on board " + bid + " since your last turn:\n- " + "\n- ".join(fresh)) if fresh else ""
+            if asks:
+                text += ("\n" if text else "") + (
+                    "Open requests to the person from agents here: " + "; ".join(asks) + ". If this message answers "
+                    "or discusses one, record it on the board now (devboard.py reply <card> <n> \"...\" or note), "
+                    "so the board stays the one place to follow the work.")
         else:
             if seen_path is not None:
                 store.atomic_write(seen_path, json.dumps(sorted(news)))
@@ -576,6 +623,10 @@ def build_parser():
     sp = cmd("ask", cmd_ask, "ask the user for something; the card is for the user until they answer")
     sp.add_argument("card")
     sp.add_argument("text")
+    sp = cmd("wait", cmd_wait, "wait in the background until the person acts on this agent's cards, then print it")
+    sp.add_argument("--as", dest="as_", help="your agent name (default: $DEVBOARD_AGENT)")
+    sp.add_argument("--timeout", default="8h", help="give up after 30m, 2h, 1d (default 8h; exit 1)")
+    sp.add_argument("--every", type=float, default=5.0, help=argparse.SUPPRESS)
     sp = cmd("requests", cmd_requests, "requests the agents left for the user (--all: every board)")
     sp.add_argument("--all", action="store_true", help="across all boards (the automatic 'user' board)")
     sp = cmd("reply", cmd_reply, "answer message N of a card (closes it)")
