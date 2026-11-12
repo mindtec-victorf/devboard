@@ -15,7 +15,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from boardlib import apply as batch  # noqa: E402
-from boardlib import agents, rollout, store  # noqa: E402
+from boardlib import agents, links, rollout, store  # noqa: E402
 from boardlib.derive import COLUMNS  # noqa: E402
 
 for _stream in (sys.stdout, sys.stderr):
@@ -184,6 +184,8 @@ def cmd_show(a):
     if a.json:
         return out_json(d)
     print(line(d))
+    if d.get("source_board"):
+        print(f"  source: {d['source_board']}/{d['source_id']} ({d.get('source_title', '')}); writes go there")
     for key in ("situation", "estimate", "due", "tags", "updated", "etag"):
         if d.get(key):
             print(f"  {key}: {_fmt(d[key])}")
@@ -345,6 +347,20 @@ def cmd_files(a):
         print(f"{f['name']}  {f['mode']}  {f['size']} B  {f.get('path') or ''}")
     if not fs:
         print("no attachments")
+
+
+def cmd_link_card(a):
+    b = pick(a)
+    for ref in a.refs:
+        b = links.link(b.id, ref)
+    print(f"board {b.id}: {len(b.meta['links'])} linked card(s); a write on one goes to its source board")
+
+
+def cmd_unlink_card(a):
+    b = pick(a)
+    for ref in a.refs:
+        b = links.unlink(b.id, ref)
+    print(f"board {b.id}: {len(b.meta.get('links') or [])} linked card(s)")
 
 
 def cmd_link_rollout(a):
@@ -575,6 +591,10 @@ def build_parser():
     sp.add_argument("name")
     sp = cmd("files", cmd_files, "list a card's attachments")
     sp.add_argument("card")
+    sp = cmd("link-card", cmd_link_card, "show cards of other boards on this one (a delivery board); writes go to the source")
+    sp.add_argument("refs", nargs="+", metavar="BOARD/CARD")
+    sp = cmd("unlink-card", cmd_unlink_card, "stop showing a linked card (the source card stays)")
+    sp.add_argument("refs", nargs="+", metavar="BOARD/CARD")
     sp = cmd("link-rollout", cmd_link_rollout, "show a STATUS.json outside the rollout folders ($DEVBOARD_ROLLOUTS)")
     sp.add_argument("path")
     sp = cmd("serve", cmd_serve, "serve the page on 127.0.0.1")

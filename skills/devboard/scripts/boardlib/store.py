@@ -848,12 +848,13 @@ def list_boards():
 
 
 def open_board(bid):
-    from . import rollout, userboard
+    from . import links, rollout, userboard
     if isinstance(bid, str) and bid.startswith(ROLLOUT_PREFIX):
         return rollout.open_rollout(bid)
     if bid == USER_BOARD:
         return userboard.UserBoard()
-    return Board(bid)
+    b = Board(bid)
+    return links.LinkedBoard(bid) if b.meta.get("links") else b
 
 
 def resolve(cwd):
