@@ -213,7 +213,7 @@ function cardHtml(c, ro) {
   if (c.files_count) chips += `<span class="clip" title="${t("chip.files")}">${I.clip} ${num(c.files_count)}</span>`;
   if (c.claimed_by) chips += `<span class="agent" title="${t("chip.claimed", { agent: esc(c.claimed_by.agent), until: esc(hm(c.claimed_by.until)) })}">${agentIcon(c.claimed_by.agent)} ${esc(c.claimed_by.agent)}</span>`;
   const link = src && S.data.kind === "user" ? href(src.board, "card", src.id) : href(S.board, "card", c.id);
-  return `<a class="card${ro && !src ? " ro" : ""}${c.id === S.moved ? " moved" : ""}" href="${link}" data-id="${esc(c.id)}" draggable="${ro || c.missing ? "false" : "true"}">
+  return `<a class="card${ro && !src ? " ro" : ""}${c.id === S.moved ? " moved" : ""}" href="${link}" title="${esc(c.title)}" data-id="${esc(c.id)}" draggable="${ro || c.missing ? "false" : "true"}">
     <div class="chips">${chips}</div>
     <div class="ctitle">${esc(c.title)}</div>
     <div class="prog"><div class="track"><span style="width:${num(c.progress)}%"></span></div><span class="pct">${pct(c)}</span></div>
@@ -234,7 +234,7 @@ const byRank = (a, b) => effRank(a) - effRank(b);
 
 function columnCards(list, key) {
   const cs = list.filter((c) => c.column === key);
-  return S.data.kind === "user" || $("#prio").checked ? cs : cs.sort(byRank);
+  return $("#prio").checked ? cs : cs.sort(byRank);
 }
 
 function renderBoard() {
@@ -293,8 +293,9 @@ function wireDrag() {
       const sameSpot = c.column === key && columnCards(S.data.cards, key).indexOf(c) === i;
       if (sameSpot) return;
       // Reordering is skipped while the priority filter sorts the columns: there the drop only changes the column.
-      // A linked card keeps its place in its source board, so only its column changes.
-      const rank = $("#prio").checked || c.source_board ? undefined
+      // A linked card on a delivery board keeps its place in its source board, so only its column changes;
+      // on the "user" board the place is kept there, apart from the source boards.
+      const rank = $("#prio").checked || (c.source_board && S.data.kind !== "user") ? undefined
         : prev && next ? (effRank(prev) + effRank(next)) / 2 : prev ? effRank(prev) + 1 : next ? effRank(next) - 1 : 0;
       if (c.column === key && rank === undefined) return;
       const from = { column: c.column, rank: c.rank };
@@ -388,8 +389,9 @@ async function renderCard(id) {
     `<option value="${esc(v)}"${(c.assignee || "") === v ? " selected" : ""}>${esc(name)}</option>`).join("")}</select></label>`;
   const requests = asked.length || answered.length ? `<h3>${I.user} ${t("req.title")} <small>${asked.length}</small></h3><div class="ask reqs">
       ${asked.map((m) => `<div class="request" data-n="${num(m.n)}"><div class="q">${who(m.by)} · ${when(m.ts)}<br>“${esc(m.text)}”</div>
-        ${ro ? "" : `<textarea placeholder="${t("req.placeholder")}"></textarea><div class="err"></div>
-        <div class="row"><span class="hint">${t("req.hint")}</span><button class="btn" data-answer="${num(m.n)}">${t("req.send")}</button></div>`}</div>`).join("")}
+        ${ro ? "" : `<textarea placeholder="${t("req.placeholder")}"></textarea><div class="picked"></div><div class="err"></div>
+        <div class="row"><label class="attach">${I.clip} ${t("req.attach")}<input type="file" multiple hidden></label>
+          <span class="hint">${t("req.hint")}</span><button class="btn" data-answer="${num(m.n)}">${t("req.send")}</button></div>`}</div>`).join("")}
       ${answered.map((m) => `<div class="answered"><b>${t("req.answered")}</b> ${esc(m.reply.text)}<br><span>${t("ask.about", { text: esc(m.text) })}</span></div>`).join("")}
     </div>` : "";
   $("#main").innerHTML = `<a class="back" href="${href(S.board)}">${I.left} ${t("card.back")}</a>
@@ -419,7 +421,8 @@ async function renderCard(id) {
       ${open.map((m) => `<div class="open">${I.msg} <b>${t("ask.waiting")}</b> · “${esc(m.text)}”</div>`).join("")}
       ${done.map((m) => `<div class="answered"><b>${t("ask.agent")}</b> ${esc(m.reply.text)}<br><span>${t("ask.about", { text: esc(m.text) })}</span></div>`).join("")}
     </div>`}
-    <h3>${t("card.history")} <small>${c.events.length}</small></h3>${timeline([...c.events].reverse(), false)}
+    <h3>${t("card.history")} <small>${c.events.length}</small></h3>${timeline([...c.events].reverse().slice(0, 5), false)}
+    ${c.events.length > 5 ? `<details class="more"><summary>${t("card.history_all", { n: c.events.length })}</summary>${timeline([...c.events].reverse().slice(5), false)}</details>` : ""}
   </aside></div>`;
   if (!ro) wireCard(c);
 }
@@ -435,11 +438,25 @@ function wireCard(c) {
     await refresh();
   };
   for (const btn of document.querySelectorAll("[data-answer]")) {
+    // The answer can carry files: picked, pasted (a screenshot) or dropped on the box; they go to the card's attachments.
+    const box = btn.closest(".request"), area = box.querySelector("textarea"), msg = box.querySelector(".err"), list = box.querySelector(".picked");
+    const files = [];
+    const show = () => {
+      list.innerHTML = files.map((f, i) => `<span class="clip">${I.clip} ${esc(f.name)} <button data-unpick="${i}" aria-label="${t("file.remove_aria", { name: esc(f.name) })}">×</button></span>`).join("");
+      for (const x of list.querySelectorAll("[data-unpick]")) x.onclick = () => { files.splice(Number(x.dataset.unpick), 1); show(); };
+    };
+    const add = (fs) => { for (const f of fs) files.push(f.name && f.name !== "image.png" ? f : new File([f], `print-${Date.now()}-${files.length + 1}.png`, { type: f.type })); msg.textContent = ""; show(); };
+    box.querySelector("input[type=file]").onchange = (e) => { add([...e.target.files]); e.target.value = ""; };
+    area.addEventListener("paste", (e) => { const fs = [...e.clipboardData.files]; if (fs.length) { e.preventDefault(); add(fs); } });
+    box.addEventListener("dragover", (e) => { if ([...e.dataTransfer.types].includes("Files")) e.preventDefault(); });
+    box.addEventListener("drop", (e) => { if (e.dataTransfer.files.length) { e.preventDefault(); e.stopPropagation(); add([...e.dataTransfer.files]); } });
     btn.onclick = async () => {
-      const box = btn.closest(".request"), area = box.querySelector("textarea"), msg = box.querySelector(".err");
-      const text = area.value.trim();
-      if (!text) { msg.textContent = t("req.empty"); area.focus(); return; }
+      let text = area.value.trim();
+      if (!text && !files.length) { msg.textContent = t("req.empty"); area.focus(); return; }
       try {
+        const names = [];
+        for (const f of files) names.push((await api(`${cardUrl(c.id)}/files`, f, f.name)).name);
+        if (names.length) text = `${text}${text ? "\n" : ""}📎 ${names.join(", ")}`;
         await api(`${cardUrl(c.id)}/reply`, { n: Number(btn.dataset.answer), text });
         await refresh();
         toast(t("toast.answered"));
@@ -629,7 +646,7 @@ document.addEventListener("keydown", (e) => {
 
 function busy() {
   return [...document.querySelectorAll("#ask, .request textarea")]
-    .some((el) => el === document.activeElement || el.value.trim() !== "");
+    .some((el) => el === document.activeElement || el.value.trim() !== "") || !!document.querySelector(".picked .clip");
 }
 
 async function poll() {

@@ -245,6 +245,9 @@ def test_requests_reply_rank_and_user_board(srv, card):
     rows = req(srv, "GET", "/api/boards")[1]
     assert rows[0]["id"] == "user" and rows[0]["kind"] == "user"
     code, ub = req(srv, "GET", "/api/b/user")
-    assert code == 200 and ub["readonly"] is True and [x["id"] for x in ub["cards"]] == ["p:1"]
+    assert code == 200 and ub["readonly"] is False and [x["id"] for x in ub["cards"]] == ["p:1"]
     assert req(srv, "GET", "/api/b/user/cards/p:1")[1]["source_board"] == "p"
     assert req(srv, "POST", "/api/b/user/cards/p:1/message", {"text": "x"}, H)[0] == 405
+    c = req(srv, "GET", "/api/b/user/cards/p:1")[1]
+    code, j = req(srv, "POST", "/api/b/user/cards/p:1/move", {"etag": c["etag"], "status": c["column"], "rank": 7}, H)
+    assert code == 200 and j["rank"] == 7 and b.card("1").get("rank") == -2  # the source keeps its own order

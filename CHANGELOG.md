@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.8.0
+- The **For you** board takes drags. A drag to another column changes the source card's status. Dropping
+  a card on Done delivers it: the source card is marked done and the card leaves For you. The Done column
+  stays empty and only receives deliveries.
+- Manual order on For you: a reorder is kept only there, in `<home>/_user.json`, so the source boards keep
+  their own order. Every other write on For you is still made on the source card.
+- Fixed card size: every card on a board has the same width (272 px columns; the board scrolls sideways
+  when they don't fit) and the same height. Long text is cut and shows whole on hover.
+- Answer an agent's request with files: pick them, paste a screenshot into the answer, or drop them on the
+  box. They go to the card's attachments, and the answer lists their names.
+- Shorter card history: the last 5 events, then "Show all (N)".
+
 ## 0.7.0
 - Linked cards: a board can show cards of other boards next to its own, for example a delivery board.
   `devboard link-card --board <id> <board>/<card> ...` adds the links, and `unlink-card` removes them.

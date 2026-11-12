@@ -165,7 +165,9 @@ Claims coordinate; they don't lock anything. You can still change any card from 
 - **Leave a message** for the agent; you'll see its reply on the card.
 - **See who** is working on a card, until when, and why, and **who it is for**; change it from the card.
 - **Answer the agents' requests** right on the card. The **For you** board, first on the home screen,
-  gathers every card that is for you or waits for your answer, from all your boards.
+  gathers every card that is for you or waits for your answer, from all your boards. Drag a card there to
+  change its status, drop it on Done to deliver it, or reorder it; the order is yours alone and the
+  source boards keep theirs.
 
 The home screen lists every board you have, grouped by repository:
 
