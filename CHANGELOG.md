@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.7.0
+- Linked cards: a board can show cards of other boards next to its own, for example a delivery board.
+  `devboard link-card --board <id> <board>/<card> ...` adds the links, and `unlink-card` removes them.
+  board.json keeps only the references (`"links"`); nothing is copied.
+- A linked card (`<board>:<card>`) shows its source card's status. Status, notes, checklist, messages,
+  requests and files written through the delivery board, from the page or the CLI, go to the source card,
+  and its history stays there. A manual reorder is not passed on, so the source board keeps its order.
+- A source card that is gone shows in Blocked until it is unlinked, and `validate` reports it. `link-card`
+  refuses missing cards, cards of the same board, and the `user` and rollout boards. `show` prints the source.
+
 ## 0.6.1
 - No `bin/` folder: claude.ai-hosted marketplaces refuse plugins that ship one. The launcher moved to
   `scripts/devboard` (`install.sh` links it as before); the hooks run it with `bash`; in Claude Code the

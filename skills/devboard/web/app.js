@@ -201,7 +201,8 @@ function renderChrome(r) {
 
 // --- board ---
 function cardHtml(c, ro) {
-  // On the automatic "user" board a card is a window on the original: it opens there, where the person acts.
+  // A card of another board: on the automatic "user" board it opens there, where the person acts;
+  // a linked card on a delivery board opens here, and its writes go to the source board.
   const src = c.source_board ? { board: c.source_board, id: c.source_id } : null;
   let chips = src ? `<span class="eid">${esc(c.source_title || src.board)} · ${label(src.id)}</span>` : `<span class="eid">${label(c.id)}</span>`;
   if (c.priority) chips += `<span class="pp">${I.target} ${t("chip.priority", { n: num(c.priority) })}</span>`;
@@ -211,8 +212,8 @@ function cardHtml(c, ro) {
   if (c.messages_open) chips += `<span class="msg" title="${t("chip.messages")}">${I.msg} ${num(c.messages_open)}</span>`;
   if (c.files_count) chips += `<span class="clip" title="${t("chip.files")}">${I.clip} ${num(c.files_count)}</span>`;
   if (c.claimed_by) chips += `<span class="agent" title="${t("chip.claimed", { agent: esc(c.claimed_by.agent), until: esc(hm(c.claimed_by.until)) })}">${agentIcon(c.claimed_by.agent)} ${esc(c.claimed_by.agent)}</span>`;
-  const link = src ? href(src.board, "card", src.id) : href(S.board, "card", c.id);
-  return `<a class="card${ro && !src ? " ro" : ""}${c.id === S.moved ? " moved" : ""}" href="${link}" data-id="${esc(c.id)}" draggable="${ro ? "false" : "true"}">
+  const link = src && S.data.kind === "user" ? href(src.board, "card", src.id) : href(S.board, "card", c.id);
+  return `<a class="card${ro && !src ? " ro" : ""}${c.id === S.moved ? " moved" : ""}" href="${link}" data-id="${esc(c.id)}" draggable="${ro || c.missing ? "false" : "true"}">
     <div class="chips">${chips}</div>
     <div class="ctitle">${esc(c.title)}</div>
     <div class="prog"><div class="track"><span style="width:${num(c.progress)}%"></span></div><span class="pct">${pct(c)}</span></div>
@@ -292,7 +293,8 @@ function wireDrag() {
       const sameSpot = c.column === key && columnCards(S.data.cards, key).indexOf(c) === i;
       if (sameSpot) return;
       // Reordering is skipped while the priority filter sorts the columns: there the drop only changes the column.
-      const rank = $("#prio").checked ? undefined
+      // A linked card keeps its place in its source board, so only its column changes.
+      const rank = $("#prio").checked || c.source_board ? undefined
         : prev && next ? (effRank(prev) + effRank(next)) / 2 : prev ? effRank(prev) + 1 : next ? effRank(next) - 1 : 0;
       if (c.column === key && rank === undefined) return;
       const from = { column: c.column, rank: c.rank };
@@ -372,7 +374,7 @@ async function renderCard(id) {
   const c = await api(`${cardUrl(id)}?events=0`);
   S.card = c;
   const ro = S.data.readonly;
-  let chips = `<span class="eid">${label(c.id)}</span><span class="status"><i class="dot ${esc(c.column)}"></i> ${colName(c.column)}</span>`;
+  let chips = `<span class="eid">${c.source_board ? `${esc(c.source_title || c.source_board)} · ${label(c.source_id)}` : label(c.id)}</span><span class="status"><i class="dot ${esc(c.column)}"></i> ${colName(c.column)}</span>`;
   if (c.priority) chips += `<span class="pp">${I.target} ${t("chip.priority", { n: num(c.priority) })}</span>`;
   if (c.assignee) chips += assigneeChip(c.assignee);
   for (const tag of c.tags || []) chips += `<span class="crit">${esc(tag)}</span>`;

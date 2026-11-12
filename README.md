@@ -261,6 +261,24 @@ There are no user accounts. Don't run `devboard serve` on a shared server.
 </details>
 
 <details>
+<summary><strong>Linked cards (delivery board)</strong></summary>
+
+A board can show cards of other boards next to its own, for example a delivery board that follows work
+done in several projects:
+
+```bash
+devboard link-card billing/12 api:7 --board delivery   # board/card or board:card
+devboard unlink-card billing/12 --board delivery       # the source card stays
+```
+
+- Linked cards show as `<board>:<card>`, after the board's own cards, in the order you linked them.
+- Nothing is copied: every write on a linked card (set, check, note, message, move) goes to the source board, and its history stays there. Moving a linked card never changes the source board's order.
+- You can link only existing cards of another regular board, not the same board, `user` or a rollout. Linking twice does nothing.
+- If the source card is deleted, the link shows in Blocked and `validate` reports it until you unlink it.
+
+</details>
+
+<details>
 <summary><strong>Rollout ledgers</strong></summary>
 
 If you apply one change across many repositories or tickets, a `STATUS.json` ledger shows up as a

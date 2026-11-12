@@ -135,6 +135,7 @@ devboard release 6 --note "baseline in the card; next: cache on, same script (sc
 | `attach <card> <file> [--link]` · `files <card>` · `detach <card> <name>` | attachments |
 | `summary` · `show <card>` · `history` · `pending` · `boards [--all]` | read (`--json` for scripts) |
 | `apply <ops.json> [--dry-run]` · `validate` · `audit` | batch · health · history vs files |
+| `link-card <board/card>...` · `unlink-card <board/card>...` | show cards of other boards on this one (writes go to the source board) · stop showing |
 | `archive` · `unarchive` · `link-rollout <STATUS.json>` | board housekeeping · rollout ledgers |
 | `serve [--port 8765]` · `hint` · `setup-agent <agent>` | the page · session-start line · instructions for other agents |
 
