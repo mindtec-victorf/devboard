@@ -6,7 +6,7 @@
   stays empty and only receives deliveries.
 - Manual order on For you: a reorder is kept only there, in `<home>/_user.json`, so the source boards keep
   their own order. Every other write on For you is still made on the source card.
-- Fixed card size: every card on a board has the same width (272 px columns; the board scrolls sideways
+- Fixed card size: every card on a board has the same width (248 px columns, five fit in 1440 px; the board scrolls sideways
   when they don't fit) and the same height. Long text is cut and shows whole on hover.
 - Answer an agent's request with files: pick them, paste a screenshot into the answer, or drop them on the
   box. They go to the card's attachments, and the answer lists their names.

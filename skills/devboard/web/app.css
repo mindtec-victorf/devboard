@@ -174,7 +174,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 @media (max-width: 1100px) { .col { max-height: 70vh; } }
 
 /* Fixed card size: every card has the same width and height; long text is cut and shown whole on hover. */
-.columns { grid-template-columns: repeat(var(--n, 5), 272px); overflow-x: auto; padding-bottom: 6px; }
+.columns { grid-template-columns: repeat(var(--n, 5), 248px); overflow-x: auto; padding-bottom: 6px; }
 .card { height: 188px; display: flex; flex-direction: column; overflow: hidden; }
 .card .chips { flex-wrap: nowrap; overflow: hidden; }
 .card .chips > * { flex-shrink: 0; }
