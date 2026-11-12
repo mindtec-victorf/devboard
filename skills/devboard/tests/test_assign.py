@@ -148,6 +148,25 @@ def test_user_board_collects_cards_for_the_user_across_boards(board, tmp_path):
         ub.card("nocolon")
 
 
+def test_user_board_move_goes_to_the_source_and_keeps_its_own_order(board, tmp_path):
+    other = store.Board.init("other", "Other", [str(tmp_path)])
+    other.add("7", "Contract", {"assignee": "user", "rank": 3})
+    board.set("1", {"assignee": "user"})
+    ub = store.open_board(store.USER_BOARD)
+    c = ub.move("other:7", "todo", rank=-5)
+    assert c["rank"] == -5 and other.card("7")["rank"] == 3  # the order lives on the user board only
+    assert store.open_board(store.USER_BOARD).card("other:7")["rank"] == -5
+    c = ub.move("other:7", "doing", etag=ub.card("other:7")["etag"])
+    assert c["column"] == "doing" and other.card("7")["status"] == "doing"
+    with pytest.raises(store.Conflict):
+        ub.move("other:7", "doing", etag="stale", rank=1)
+    ub.move("proj:1", "done")  # delivering: done on the source, and it leaves the user board
+    assert board.card("1")["column"] == "done"
+    assert [x["id"] for x in store.open_board(store.USER_BOARD).cards()] == ["other:7"]
+    with pytest.raises(store.BoardError, match="rank"):
+        ub.move("other:7", "doing", rank="x")
+
+
 def test_user_board_in_overview_only_when_not_empty(board):
     assert store.USER_BOARD not in [r["id"] for r in store.overview()]
     board.set("1", {"assignee": "user"})
